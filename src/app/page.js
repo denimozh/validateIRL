@@ -105,10 +105,6 @@ export default function LandingPage() {
         {/* METRICS */}
         <div className="flex gap-8 mt-10">
           <div className="text-center">
-            <div className="text-2xl font-bold text-[#22c55e]">0</div>
-            <div className="text-sm text-[#71717a]">Early believers</div>
-          </div>
-          <div className="text-center">
             <div className="text-2xl font-bold text-[#22c55e]">2 weeks</div>
             <div className="text-sm text-[#71717a]">To launch</div>
           </div>

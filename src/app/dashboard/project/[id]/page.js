@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AddSignalModal from '@/components/AddSignalModal';
+import SignalCard from '@/components/SignalCard';
 import { supabase } from '@/lib/supabase';
 
 const STATUS_OPTIONS = [
@@ -20,16 +22,19 @@ function ProjectContent({ params }) {
   const router = useRouter();
 
   const [project, setProject] = useState(null);
+  const [signals, setSignals] = useState([]);
+  const [outreachMap, setOutreachMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [stats, setStats] = useState({ totalSignals: 0, contacted: 0, replied: 0, wouldPay: 0 });
 
   useEffect(() => {
     if (user && id) {
       fetchProject();
-      fetchStats();
+      fetchSignals();
     }
   }, [user, id]);
 
@@ -43,7 +48,6 @@ function ProjectContent({ params }) {
 
       if (error) throw error;
       
-      // Check if user owns this project
       if (data.user_id !== user.id) {
         router.push('/dashboard');
         return;
@@ -64,26 +68,42 @@ function ProjectContent({ params }) {
     }
   };
 
-  const fetchStats = async () => {
+  const fetchSignals = async () => {
     try {
-      const { data: signals } = await supabase
+      // Fetch signals
+      const { data: signalsData, error: signalsError } = await supabase
         .from('signals')
-        .select('id')
-        .eq('project_id', id);
+        .select('*')
+        .eq('project_id', id)
+        .order('found_at', { ascending: false });
 
-      const { data: outreach } = await supabase
+      if (signalsError) throw signalsError;
+      setSignals(signalsData || []);
+
+      // Fetch outreach data
+      const { data: outreachData, error: outreachError } = await supabase
         .from('outreach')
-        .select('status')
+        .select('*')
         .eq('project_id', id);
 
-      setStats({
-        totalSignals: signals?.length || 0,
-        contacted: outreach?.filter(o => o.status !== 'found').length || 0,
-        replied: outreach?.filter(o => ['replied', 'interested', 'would_pay'].includes(o.status)).length || 0,
-        wouldPay: outreach?.filter(o => o.status === 'would_pay').length || 0,
-      });
+      if (outreachError) throw outreachError;
+
+      // Create a map of signal_id -> outreach
+      const outreach = {};
+      for (const o of outreachData || []) {
+        outreach[o.signal_id] = o;
+      }
+      setOutreachMap(outreach);
+
+      // Calculate stats
+      const totalSignals = signalsData?.length || 0;
+      const contacted = outreachData?.filter(o => o.status !== 'found').length || 0;
+      const replied = outreachData?.filter(o => ['replied', 'interested', 'would_pay'].includes(o.status)).length || 0;
+      const wouldPay = outreachData?.filter(o => o.status === 'would_pay').length || 0;
+
+      setStats({ totalSignals, contacted, replied, wouldPay });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      console.error('Error fetching signals:', error);
     }
   };
 
@@ -117,6 +137,109 @@ function ProjectContent({ params }) {
     }
   };
 
+  const handleSaveSignal = async (signal) => {
+    try {
+      // Insert signal
+      const signalToInsert = {
+        project_id: id,
+        platform: signal.platform,
+        url: signal.url,
+        author: signal.author,
+        content: signal.title + (signal.content ? '\n\n' + signal.content : ''),
+        subreddit: signal.subreddit,
+        upvotes: signal.upvotes,
+        comments_count: signal.commentsCount,
+        posted_at: signal.postedAt,
+        intent_score: signal.intentScore,
+        signal_tags: signal.signalTags,
+        content_hash: signal.contentHash,
+      };
+
+      const { data: insertedSignal, error: signalError } = await supabase
+        .from('signals')
+        .insert([signalToInsert])
+        .select()
+        .single();
+
+      if (signalError) throw signalError;
+
+      // Create outreach entry
+      const { error: outreachError } = await supabase
+        .from('outreach')
+        .insert([{
+          signal_id: insertedSignal.id,
+          project_id: id,
+          status: 'found',
+        }]);
+
+      if (outreachError) throw outreachError;
+
+      // Refresh signals
+      await fetchSignals();
+    } catch (error) {
+      console.error('Error saving signal:', error);
+      throw error;
+    }
+  };
+
+  const handleUpdateOutreach = async (signalId, updates) => {
+    try {
+      const existingOutreach = outreachMap[signalId];
+
+      if (existingOutreach) {
+        const { error } = await supabase
+          .from('outreach')
+          .update(updates)
+          .eq('signal_id', signalId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('outreach')
+          .insert({
+            signal_id: signalId,
+            project_id: id,
+            ...updates,
+          });
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      setOutreachMap({
+        ...outreachMap,
+        [signalId]: { ...existingOutreach, ...updates },
+      });
+
+      // Recalculate stats
+      await fetchSignals();
+    } catch (error) {
+      console.error('Error updating outreach:', error);
+    }
+  };
+
+  const handleDeleteSignal = async (signalId) => {
+    try {
+      const { error } = await supabase
+        .from('signals')
+        .delete()
+        .eq('id', signalId);
+
+      if (error) throw error;
+
+      setSignals(signals.filter(s => s.id !== signalId));
+      
+      const newOutreachMap = { ...outreachMap };
+      delete newOutreachMap[signalId];
+      setOutreachMap(newOutreachMap);
+
+      // Recalculate stats
+      await fetchSignals();
+    } catch (error) {
+      console.error('Error deleting signal:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0b] flex items-center justify-center">
@@ -132,6 +255,11 @@ function ProjectContent({ params }) {
 
   const validationProgress = Math.min((stats.wouldPay / 3) * 100, 100);
   const isValidated = stats.wouldPay >= 3;
+
+  // Group signals by intent
+  const highIntentSignals = signals.filter(s => s.intent_score === 'high');
+  const mediumIntentSignals = signals.filter(s => s.intent_score === 'medium');
+  const lowIntentSignals = signals.filter(s => s.intent_score === 'low');
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-[#fafafa]">
@@ -292,21 +420,110 @@ function ProjectContent({ params }) {
           </p>
         </div>
 
-        {/* Signals Section - Placeholder for now */}
-        <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        {/* Signals Section */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-bold">Signals</h2>
+          <button
+            onClick={() => setShowSearchModal(true)}
+            className="px-4 py-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-semibold transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-          </div>
-          <h2 className="text-xl font-bold mb-2">No signals yet</h2>
-          <p className="text-[#a1a1aa] mb-6">Search for real people expressing your pain</p>
-          <button className="px-6 py-3 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-bold transition-colors">
-            🔍 Search for Signals
+            Add Signal
           </button>
-          <p className="text-xs text-[#71717a] mt-4">Coming next: Reddit API integration</p>
         </div>
+
+        {signals.length === 0 ? (
+          <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center">
+            <div className="w-16 h-16 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-[#22c55e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold mb-2">No signals yet</h2>
+            <p className="text-[#a1a1aa] mb-6">Add Reddit posts from people expressing your pain</p>
+            <button 
+              onClick={() => setShowSearchModal(true)}
+              className="px-6 py-3 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-bold transition-colors"
+            >
+              + Add Your First Signal
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* High Intent */}
+            {highIntentSignals.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-[#22c55e] mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-[#22c55e] rounded-full"></span>
+                  High Intent ({highIntentSignals.length})
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {highIntentSignals.map(signal => (
+                    <SignalCard
+                      key={signal.id}
+                      signal={signal}
+                      outreach={outreachMap[signal.id]}
+                      onUpdateOutreach={handleUpdateOutreach}
+                      onDelete={handleDeleteSignal}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Medium Intent */}
+            {mediumIntentSignals.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-yellow-500 mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                  Medium Intent ({mediumIntentSignals.length})
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {mediumIntentSignals.map(signal => (
+                    <SignalCard
+                      key={signal.id}
+                      signal={signal}
+                      outreach={outreachMap[signal.id]}
+                      onUpdateOutreach={handleUpdateOutreach}
+                      onDelete={handleDeleteSignal}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Low Intent */}
+            {lowIntentSignals.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-[#71717a] mb-3 flex items-center gap-2">
+                  <span className="w-2 h-2 bg-[#71717a] rounded-full"></span>
+                  Low Intent ({lowIntentSignals.length})
+                </h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {lowIntentSignals.map(signal => (
+                    <SignalCard
+                      key={signal.id}
+                      signal={signal}
+                      outreach={outreachMap[signal.id]}
+                      onUpdateOutreach={handleUpdateOutreach}
+                      onDelete={handleDeleteSignal}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </main>
+
+      {/* Add Signal Modal */}
+      <AddSignalModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        onSaveSignal={handleSaveSignal}
+      />
     </div>
   );
 }

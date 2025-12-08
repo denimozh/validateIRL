@@ -1,0 +1,208 @@
+'use client';
+
+import { useState, useRef } from 'react';
+
+const PIPELINE_STAGES = [
+  { id: 'found', label: 'Found', emoji: '🎯', color: 'border-[#71717a]', bg: 'bg-[#71717a]/10' },
+  { id: 'contacted', label: 'Contacted', emoji: '📤', color: 'border-blue-500', bg: 'bg-blue-500/10' },
+  { id: 'replied', label: 'Replied', emoji: '💬', color: 'border-yellow-500', bg: 'bg-yellow-500/10' },
+  { id: 'interested', label: 'Interested', emoji: '👀', color: 'border-orange-500', bg: 'bg-orange-500/10' },
+  { id: 'would_pay', label: "I'd Pay", emoji: '💰', color: 'border-[#22c55e]', bg: 'bg-[#22c55e]/10' },
+];
+
+const INTENT_COLORS = {
+  high: 'border-l-[#22c55e]',
+  medium: 'border-l-yellow-500',
+  low: 'border-l-[#71717a]',
+};
+
+function PipelineCard({ signal, onDragStart }) {
+  const subreddit = signal.subreddit || signal.url?.match(/r\/(\w+)/)?.[1] || 'reddit';
+  const title = signal.content?.split('\n')[0]?.slice(0, 50) || 'Untitled';
+
+  return (
+    <div 
+      draggable
+      onDragStart={(e) => onDragStart(e, signal.id)}
+      className={`bg-[#0a0a0b] border border-[#27272a] border-l-4 ${INTENT_COLORS[signal.intent_score] || 'border-l-[#71717a]'} rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-[#3f3f46] transition-all hover:shadow-lg`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs text-[#22c55e] font-medium">r/{subreddit}</span>
+        <span className="text-xs text-[#71717a]">• u/{signal.author}</span>
+      </div>
+      
+      <p className="text-sm text-white mb-3 line-clamp-2">{title}</p>
+      
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-1">
+          {signal.intent_score === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#22c55e]/20 text-[#22c55e]">HIGH</span>}
+          {signal.intent_score === 'medium' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">MED</span>}
+        </div>
+        <a 
+          href={signal.url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-[10px] text-[#22c55e] hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          View →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+export default function PipelineView({ signals, outreachMap, onUpdateOutreach }) {
+  const [draggedSignalId, setDraggedSignalId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
+  
+  // Drag to scroll
+  const scrollRef = useRef(null);
+  const [isDraggingScroll, setIsDraggingScroll] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleMouseDown = (e) => {
+    // Only activate if clicking on the container, not on cards
+    if (e.target.closest('[draggable="true"]')) return;
+    
+    setIsDraggingScroll(true);
+    setStartX(e.pageX - scrollRef.current.offsetLeft);
+    setScrollLeft(scrollRef.current.scrollLeft);
+  };
+
+  const handleMouseUp = () => {
+    setIsDraggingScroll(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDraggingScroll) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    scrollRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseLeave = () => {
+    setIsDraggingScroll(false);
+  };
+
+  // Group signals by outreach status
+  const signalsByStage = PIPELINE_STAGES.reduce((acc, stage) => {
+    acc[stage.id] = signals.filter(signal => {
+      const status = outreachMap[signal.id]?.status || 'found';
+      return status === stage.id;
+    });
+    return acc;
+  }, {});
+
+  const totalSignals = signals.length;
+
+  const handleDragStart = (e, signalId) => {
+    setDraggedSignalId(signalId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e, stageId) => {
+    e.preventDefault();
+    setDragOverStage(stageId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStage(null);
+  };
+
+  const handleDrop = async (e, stageId) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    
+    if (draggedSignalId) {
+      await onUpdateOutreach(draggedSignalId, { status: stageId });
+      setDraggedSignalId(null);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      {/* Pipeline Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold">Pipeline</h2>
+        <span className="text-sm text-[#71717a]">{totalSignals} signals</span>
+      </div>
+
+      {/* Kanban Board - Horizontal scroll without visible scrollbar */}
+      <div 
+        ref={scrollRef}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className={`overflow-x-auto scrollbar-hide pb-2 ${isDraggingScroll ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+          {PIPELINE_STAGES.map((stage) => {
+            const stageSignals = signalsByStage[stage.id] || [];
+            const count = stageSignals.length;
+            const isDragOver = dragOverStage === stage.id;
+            
+            return (
+              <div 
+                key={stage.id} 
+                className={`w-64 flex-shrink-0 bg-[#161618] border-2 ${isDragOver ? 'border-[#22c55e] bg-[#22c55e]/5' : stage.color} rounded-xl p-3 transition-colors`}
+                onDragOver={(e) => handleDragOver(e, stage.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, stage.id)}
+              >
+              {/* Column Header */}
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#27272a]">
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">{stage.emoji}</span>
+                  <span className="font-medium text-xs">{stage.label}</span>
+                </div>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full ${stage.bg} font-medium`}>
+                  {count}
+                </span>
+              </div>
+
+              {/* Cards */}
+              <div className="space-y-2 min-h-[150px] max-h-[400px] overflow-y-auto">
+                {stageSignals.length === 0 ? (
+                  <div className={`flex items-center justify-center h-20 border border-dashed ${isDragOver ? 'border-[#22c55e]' : 'border-[#27272a]'} rounded-lg transition-colors`}>
+                    <p className="text-[10px] text-[#71717a]">{isDragOver ? 'Drop here' : 'Drag signals here'}</p>
+                  </div>
+                ) : (
+                  stageSignals.map(signal => (
+                    <PipelineCard
+                      key={signal.id}
+                      signal={signal}
+                      onDragStart={handleDragStart}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-5 gap-2 mt-4 p-3 bg-[#161618] border border-[#27272a] rounded-xl">
+        {PIPELINE_STAGES.map((stage) => {
+          const count = signalsByStage[stage.id]?.length || 0;
+          const percentage = totalSignals > 0 ? Math.round((count / totalSignals) * 100) : 0;
+          
+          return (
+            <div key={stage.id} className="text-center">
+              <div className="text-lg font-bold">{count}</div>
+              <div className="text-[10px] text-[#71717a] hidden sm:block">{stage.label}</div>
+              <div className="text-[10px] text-[#71717a] sm:hidden">{stage.emoji}</div>
+              <div className="text-[10px] text-[#52525b]">{percentage}%</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

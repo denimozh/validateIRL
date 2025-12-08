@@ -26,6 +26,8 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState(outreach?.notes || '');
   const [saving, setSaving] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState(outreach?.follow_up_date || '');
 
   const intent = INTENT_STYLES[signal.intent_score] || INTENT_STYLES.low;
   const currentStatus = outreach?.status || 'found';
@@ -53,6 +55,44 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
     }
   };
 
+  const handleSaveFollowUp = async () => {
+    setSaving(true);
+    try {
+      await onUpdateOutreach(signal.id, { follow_up_date: followUpDate || null });
+      setShowFollowUp(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearFollowUp = async () => {
+    setSaving(true);
+    try {
+      await onUpdateOutreach(signal.id, { follow_up_date: null });
+      setFollowUpDate('');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getFollowUpStatus = () => {
+    if (!outreach?.follow_up_date) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const followUp = new Date(outreach.follow_up_date);
+    followUp.setHours(0, 0, 0, 0);
+    
+    const diffDays = Math.floor((followUp - today) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return { label: 'Overdue', color: 'bg-red-500/20 text-red-400', urgent: true };
+    if (diffDays === 0) return { label: 'Due today', color: 'bg-yellow-500/20 text-yellow-500', urgent: true };
+    if (diffDays === 1) return { label: 'Due tomorrow', color: 'bg-blue-500/20 text-blue-400', urgent: false };
+    if (diffDays <= 7) return { label: `Due in ${diffDays}d`, color: 'bg-[#27272a] text-[#a1a1aa]', urgent: false };
+    return { label: formatDate(outreach.follow_up_date), color: 'bg-[#27272a] text-[#71717a]', urgent: false };
+  };
+
+  const followUpStatus = getFollowUpStatus();
+
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -76,6 +116,11 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
           <span className="text-xs text-[#22c55e] font-medium">r/{signal.subreddit}</span>
           <span className="text-xs text-[#71717a]">• {formatDate(signal.posted_at)}</span>
           <span className="text-xs text-[#71717a]">• u/{signal.author}</span>
+          {followUpStatus && (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${followUpStatus.color} ${followUpStatus.urgent ? 'animate-pulse' : ''}`}>
+              🔔 {followUpStatus.label}
+            </span>
+          )}
         </div>
         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${intent.bg} ${intent.text}`}>
           {intent.label}
@@ -154,7 +199,7 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
         </div>
       ) : (
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#27272a]">
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={() => setShowNotes(true)}
               className="text-xs text-[#71717a] hover:text-white transition-colors flex items-center gap-1"
@@ -164,11 +209,15 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
               </svg>
               {outreach?.notes ? 'Edit notes' : 'Add notes'}
             </button>
-            {outreach?.notes && (
-              <span className="text-xs text-[#71717a] truncate max-w-[150px]">
-                — {outreach.notes}
-              </span>
-            )}
+            <button
+              onClick={() => setShowFollowUp(true)}
+              className="text-xs text-[#71717a] hover:text-white transition-colors flex items-center gap-1"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {outreach?.follow_up_date ? 'Edit reminder' : 'Set reminder'}
+            </button>
           </div>
           <div className="flex gap-2">
             <a
@@ -185,6 +234,63 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
             >
               Remove
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Follow-up Date Picker */}
+      {showFollowUp && (
+        <div className="mt-3 pt-3 border-t border-[#27272a]">
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={followUpDate}
+              onChange={(e) => setFollowUpDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="flex-1 px-3 py-2 rounded-lg border border-[#27272a] bg-[#0a0a0b] text-white text-sm focus:border-[#22c55e] focus:outline-none"
+            />
+            <button
+              onClick={handleSaveFollowUp}
+              disabled={saving}
+              className="text-xs px-3 py-2 rounded-lg bg-[#22c55e] text-[#0a0a0b] font-medium hover:bg-[#16a34a] transition-colors disabled:opacity-50"
+            >
+              {saving ? '...' : 'Save'}
+            </button>
+            {outreach?.follow_up_date && (
+              <button
+                onClick={clearFollowUp}
+                disabled={saving}
+                className="text-xs px-3 py-2 rounded-lg bg-[#27272a] text-[#a1a1aa] hover:text-white transition-colors disabled:opacity-50"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              onClick={() => setShowFollowUp(false)}
+              className="text-xs px-3 py-2 text-[#71717a] hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+          <div className="flex gap-2 mt-2">
+            {[
+              { label: 'Tomorrow', days: 1 },
+              { label: '3 days', days: 3 },
+              { label: '1 week', days: 7 },
+            ].map((option) => {
+              const date = new Date();
+              date.setDate(date.getDate() + option.days);
+              const dateStr = date.toISOString().split('T')[0];
+              return (
+                <button
+                  key={option.days}
+                  onClick={() => setFollowUpDate(dateStr)}
+                  className="text-xs px-2 py-1 rounded-md bg-[#27272a] text-[#a1a1aa] hover:text-white hover:bg-[#3f3f46] transition-colors"
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

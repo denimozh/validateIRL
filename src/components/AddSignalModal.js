@@ -292,7 +292,7 @@ export default function AddSignalModal({ isOpen, onClose, onSaveSignal }) {
           <div className="bg-[#161618] border border-[#27272a] rounded-lg p-4">
             <h4 className="text-sm font-medium mb-2 flex items-center gap-2"><span>💡</span> How to find good signals</h4>
             <ul className="text-xs text-[#a1a1aa] space-y-1">
-              <li>• Search Reddit for your pain point (e.g., "frustrated with expense tracking")</li>
+              <li>• Search Reddit for your pain point (e.g., &quot;frustrated with expense tracking&quot;)</li>
               <li>• Look in subreddits like r/entrepreneur, r/smallbusiness, r/SaaS</li>
               <li>• Find posts where people complain or ask for solutions</li>
               <li>• Copy the post URL and paste it here</li>

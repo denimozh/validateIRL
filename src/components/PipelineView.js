@@ -16,33 +16,59 @@ const INTENT_COLORS = {
   low: 'border-l-[#71717a]',
 };
 
-function PipelineCard({ signal, onDragStart }) {
+function PipelineCard({ signal, outreach, onDragStart }) {
   const subreddit = signal.subreddit || signal.url?.match(/r\/(\w+)/)?.[1] || 'reddit';
   const title = signal.content?.split('\n')[0]?.slice(0, 50) || 'Untitled';
+
+  // Calculate follow-up status
+  const getFollowUpStatus = () => {
+    if (!outreach?.follow_up_date) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const followUp = new Date(outreach.follow_up_date);
+    followUp.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((followUp - today) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return { label: 'Overdue', color: 'bg-red-500/20 text-red-400', urgent: true };
+    if (diffDays === 0) return { label: 'Today', color: 'bg-yellow-500/20 text-yellow-500', urgent: true };
+    if (diffDays === 1) return { label: 'Tomorrow', color: 'bg-blue-500/20 text-blue-400', urgent: false };
+    return null; // Don't show for dates further out
+  };
+
+  const followUpStatus = getFollowUpStatus();
 
   return (
     <div 
       draggable
       onDragStart={(e) => onDragStart(e, signal.id)}
-      className={`bg-[#0a0a0b] border border-[#27272a] border-l-4 ${INTENT_COLORS[signal.intent_score] || 'border-l-[#71717a]'} rounded-lg p-3 cursor-grab active:cursor-grabbing hover:border-[#3f3f46] transition-all hover:shadow-lg`}
+      className={`bg-[#0a0a0b] border border-[#27272a] border-l-4 ${INTENT_COLORS[signal.intent_score] || 'border-l-[#71717a]'} rounded-lg p-2 sm:p-3 cursor-grab active:cursor-grabbing hover:border-[#3f3f46] transition-all hover:shadow-lg`}
     >
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-xs text-[#22c55e] font-medium">r/{subreddit}</span>
-        <span className="text-xs text-[#71717a]">• u/{signal.author}</span>
+      {/* Follow-up badge */}
+      {followUpStatus && (
+        <div className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded-full ${followUpStatus.color} font-medium mb-1.5 inline-flex items-center gap-1 ${followUpStatus.urgent ? 'animate-pulse' : ''}`}>
+          <span>🔔</span>
+          <span>{followUpStatus.label}</span>
+        </div>
+      )}
+      
+      <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
+        <span className="text-[10px] sm:text-xs text-[#22c55e] font-medium truncate">r/{subreddit}</span>
+        <span className="text-[10px] sm:text-xs text-[#71717a] hidden sm:inline">•</span>
+        <span className="text-[10px] sm:text-xs text-[#71717a] truncate hidden sm:inline">u/{signal.author}</span>
       </div>
       
-      <p className="text-sm text-white mb-3 line-clamp-2">{title}</p>
+      <p className="text-xs sm:text-sm text-white mb-2 sm:mb-3 line-clamp-2">{title}</p>
       
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-1">
-          {signal.intent_score === 'high' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#22c55e]/20 text-[#22c55e]">HIGH</span>}
-          {signal.intent_score === 'medium' && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">MED</span>}
+          {signal.intent_score === 'high' && <span className="text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-[#22c55e]/20 text-[#22c55e]">HIGH</span>}
+          {signal.intent_score === 'medium' && <span className="text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">MED</span>}
         </div>
         <a 
           href={signal.url} 
           target="_blank" 
           rel="noopener noreferrer"
-          className="text-[10px] text-[#22c55e] hover:underline"
+          className="text-[9px] sm:text-[10px] text-[#22c55e] hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
           View →
@@ -130,52 +156,44 @@ export default function PipelineView({ signals, outreachMap, onUpdateOutreach })
         <span className="text-sm text-[#71717a]">{totalSignals} signals</span>
       </div>
 
-      {/* Kanban Board - Horizontal scroll without visible scrollbar */}
-      <div 
-        ref={scrollRef}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        className={`overflow-x-auto scrollbar-hide pb-2 ${isDraggingScroll ? 'cursor-grabbing' : 'cursor-grab'}`}
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
-          {PIPELINE_STAGES.map((stage) => {
-            const stageSignals = signalsByStage[stage.id] || [];
-            const count = stageSignals.length;
-            const isDragOver = dragOverStage === stage.id;
-            
-            return (
-              <div 
-                key={stage.id} 
-                className={`w-64 flex-shrink-0 bg-[#161618] border-2 ${isDragOver ? 'border-[#22c55e] bg-[#22c55e]/5' : stage.color} rounded-xl p-3 transition-colors`}
-                onDragOver={(e) => handleDragOver(e, stage.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, stage.id)}
-              >
+      {/* Kanban Board - Grid layout to fit all 5 columns */}
+      <div className="grid grid-cols-5 gap-2 sm:gap-3">
+        {PIPELINE_STAGES.map((stage) => {
+          const stageSignals = signalsByStage[stage.id] || [];
+          const count = stageSignals.length;
+          const isDragOver = dragOverStage === stage.id;
+          
+          return (
+            <div 
+              key={stage.id} 
+              className={`bg-[#161618] border-2 ${isDragOver ? 'border-[#22c55e] bg-[#22c55e]/5' : stage.color} rounded-xl p-2 sm:p-3 transition-colors`}
+              onDragOver={(e) => handleDragOver(e, stage.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, stage.id)}
+            >
               {/* Column Header */}
-              <div className="flex items-center justify-between mb-3 pb-2 border-b border-[#27272a]">
-                <div className="flex items-center gap-1">
-                  <span className="text-sm">{stage.emoji}</span>
-                  <span className="font-medium text-xs">{stage.label}</span>
+              <div className="flex items-center justify-between mb-2 sm:mb-3 pb-2 border-b border-[#27272a]">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="text-xs sm:text-sm flex-shrink-0">{stage.emoji}</span>
+                  <span className="font-medium text-[10px] sm:text-xs truncate hidden sm:block">{stage.label}</span>
                 </div>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${stage.bg} font-medium`}>
+                <span className={`text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded-full ${stage.bg} font-medium flex-shrink-0`}>
                   {count}
                 </span>
               </div>
 
               {/* Cards */}
-              <div className="space-y-2 min-h-[150px] max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 min-h-[100px] sm:min-h-[150px] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
                 {stageSignals.length === 0 ? (
-                  <div className={`flex items-center justify-center h-20 border border-dashed ${isDragOver ? 'border-[#22c55e]' : 'border-[#27272a]'} rounded-lg transition-colors`}>
-                    <p className="text-[10px] text-[#71717a]">{isDragOver ? 'Drop here' : 'Drag signals here'}</p>
+                  <div className={`flex items-center justify-center h-16 sm:h-20 border border-dashed ${isDragOver ? 'border-[#22c55e]' : 'border-[#27272a]'} rounded-lg transition-colors`}>
+                    <p className="text-[8px] sm:text-[10px] text-[#71717a] text-center px-1">{isDragOver ? 'Drop' : 'Empty'}</p>
                   </div>
                 ) : (
                   stageSignals.map(signal => (
                     <PipelineCard
                       key={signal.id}
                       signal={signal}
+                      outreach={outreachMap[signal.id]}
                       onDragStart={handleDragStart}
                     />
                   ))
@@ -184,7 +202,6 @@ export default function PipelineView({ signals, outreachMap, onUpdateOutreach })
             </div>
           );
         })}
-        </div>
       </div>
 
       {/* Quick Stats */}

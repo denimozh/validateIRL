@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import OutreachTemplates from './OutreachTemplates';
 
 const INTENT_STYLES = {
   high: { bg: 'bg-[#22c55e]/20', text: 'text-[#22c55e]', label: 'HIGH INTENT' },
@@ -22,12 +23,13 @@ const TAG_STYLES = {
   budget_mention: { emoji: '💰', label: 'Budget' },
 };
 
-export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelete }) {
+export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelete, projectPain }) {
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState(outreach?.notes || '');
   const [saving, setSaving] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
   const [followUpDate, setFollowUpDate] = useState(outreach?.follow_up_date || '');
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const intent = INTENT_STYLES[signal.intent_score] || INTENT_STYLES.low;
   const currentStatus = outreach?.status || 'found';
@@ -201,13 +203,22 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-[#27272a]">
           <div className="flex gap-3">
             <button
+              onClick={() => setShowTemplates(true)}
+              className="text-xs text-[#22c55e] hover:text-[#16a34a] transition-colors flex items-center gap-1 font-medium"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              Templates
+            </button>
+            <button
               onClick={() => setShowNotes(true)}
               className="text-xs text-[#71717a] hover:text-white transition-colors flex items-center gap-1"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              {outreach?.notes ? 'Edit notes' : 'Add notes'}
+              {outreach?.notes ? 'Notes' : 'Notes'}
             </button>
             <button
               onClick={() => setShowFollowUp(true)}
@@ -216,7 +227,7 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {outreach?.follow_up_date ? 'Edit reminder' : 'Set reminder'}
+              {outreach?.follow_up_date ? 'Reminder' : 'Reminder'}
             </button>
           </div>
           <div className="flex gap-2">
@@ -294,6 +305,14 @@ export default function SignalCard({ signal, outreach, onUpdateOutreach, onDelet
           </div>
         </div>
       )}
+
+      {/* Outreach Templates Modal */}
+      <OutreachTemplates
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        signal={signal}
+        projectPain={projectPain}
+      />
     </div>
   );
 }

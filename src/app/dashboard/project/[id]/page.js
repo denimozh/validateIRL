@@ -8,8 +8,13 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import AddSignalModal from '@/components/AddSignalModal';
 import SignalCard from '@/components/SignalCard';
 import PipelineView from '@/components/PipelineView';
-import LaunchRoadmap from '@/components/LaunchRoadmap';
+import LaunchCalendar from '@/components/LaunchCalendar';
 import ValidatedLeadsList from '@/components/ValidatedLeadsList';
+import IdeaInsights from '@/components/IdeaInsights';
+import MicroTasks from '@/components/MicroTasks';
+import Streaks from '@/components/Streaks';
+import AutoDiscovery from '@/components/AutoDiscovery';
+import ResponseTracker from '@/components/ResponseTracker';
 import { supabase } from '@/lib/supabase';
 
 function ProjectContent({ params }) {
@@ -197,11 +202,17 @@ function ProjectContent({ params }) {
   };
 
   const handleDeleteSignal = async (signalId) => {
-    await supabase.from('signals').delete().eq('id', signalId);
-    setSignals(signals.filter(s => s.id !== signalId));
-    const newMap = { ...outreachMap };
-    delete newMap[signalId];
-    setOutreachMap(newMap);
+    try {
+      await supabase.from('signals').delete().eq('id', signalId);
+      setSignals(prev => prev.filter(s => s.id !== signalId));
+      setOutreachMap(prev => {
+        const newMap = { ...prev };
+        delete newMap[signalId];
+        return newMap;
+      });
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
   };
 
   if (loading) {
@@ -352,27 +363,33 @@ function ProjectContent({ params }) {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 -mb-px">
+          <div className="flex gap-1 -mb-px overflow-x-auto">
             {[
               { id: 'pipeline', label: 'Pipeline' },
               { id: 'leads', label: 'Leads', count: stats.wouldPay },
+              { id: 'insights', label: 'Insights', emoji: '🧠' },
+              { id: 'responses', label: 'Responses', emoji: '📊' },
               { id: 'list', label: 'List' },
-              { id: 'roadmap', label: 'Roadmap' },
+              { id: 'roadmap', label: 'Launch', emoji: '📅', locked: !isValidated },
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors capitalize flex items-center gap-1.5 ${
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 flex-shrink-0 ${
                   activeTab === tab.id
                     ? 'border-[#22c55e] text-white'
                     : 'border-transparent text-[#71717a] hover:text-white'
                 }`}
               >
+                {tab.emoji && <span className="text-xs">{tab.emoji}</span>}
                 {tab.label}
                 {tab.count > 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#22c55e]/20 text-[#22c55e]">
                     {tab.count}
                   </span>
+                )}
+                {tab.locked && (
+                  <span className="text-[10px]">🔒</span>
                 )}
               </button>
             ))}
@@ -425,6 +442,23 @@ function ProjectContent({ params }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {/* Auto Discovery */}
+        <div className="mb-6">
+          <AutoDiscovery
+            projectId={id}
+            projectName={project.name}
+            painDescription={project.pain_description}
+            isEnabled={project.auto_discovery_enabled}
+            lastDiscoveryAt={project.last_discovery_at}
+            onNewSignals={(newSignals) => {
+              setSignals(prev => [...newSignals, ...prev]);
+            }}
+            onToggle={(enabled) => {
+              setProject(prev => ({ ...prev, auto_discovery_enabled: enabled }));
+            }}
+          />
+        </div>
+
         {signals.length === 0 ? (
           <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center max-w-md mx-auto">
             <div className="w-16 h-16 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -439,27 +473,58 @@ function ProjectContent({ params }) {
               + Add Your First Signal
             </button>
           </div>
-        ) : activeTab === 'pipeline' ? (
-          <PipelineView 
-            signals={signals}
-            outreachMap={outreachMap}
-            onUpdateOutreach={handleUpdateOutreach}
-          />
-        ) : activeTab === 'leads' ? (
-          <ValidatedLeadsList
-            signals={signals}
-            outreachMap={outreachMap}
-            onUpdateOutreach={handleUpdateOutreach}
-            projectPain={project.pain_description}
-          />
-        ) : activeTab === 'roadmap' ? (
-          <LaunchRoadmap 
-            signals={signals}
-            outreachMap={outreachMap}
-            isValidated={isValidated}
-            wouldPayCount={stats.wouldPay}
-          />
         ) : (
+          <>
+            {/* Widgets Row - Only show on Pipeline tab */}
+            {activeTab === 'pipeline' && (
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                <MicroTasks signals={signals} outreachMap={outreachMap} />
+                <Streaks signals={signals} outreachMap={outreachMap} projectCreatedAt={project.created_at} />
+              </div>
+            )}
+
+            {/* Tab Content */}
+            {activeTab === 'pipeline' ? (
+              <PipelineView 
+                signals={signals}
+                outreachMap={outreachMap}
+                onUpdateOutreach={handleUpdateOutreach}
+                onDelete={handleDeleteSignal}
+              />
+            ) : activeTab === 'leads' ? (
+              <ValidatedLeadsList
+                signals={signals}
+                outreachMap={outreachMap}
+                onUpdateOutreach={handleUpdateOutreach}
+                projectPain={project.pain_description}
+              />
+            ) : activeTab === 'insights' ? (
+              <IdeaInsights
+                signals={signals}
+                outreachMap={outreachMap}
+                projectName={project.name}
+                projectPain={project.pain_description}
+              />
+            ) : activeTab === 'responses' ? (
+              <ResponseTracker
+                projectId={id}
+                projectName={project.name}
+              />
+            ) : activeTab === 'roadmap' ? (
+              <LaunchCalendar 
+                projectId={id}
+                signals={signals}
+                outreachMap={outreachMap}
+                isValidated={isValidated}
+                wouldPayCount={stats.wouldPay}
+                projectName={project.name}
+                projectPain={project.pain_description}
+                targetAudience={project.target_audience}
+                savedCalendar={project.calendar_data}
+                savedProgress={project.calendar_progress}
+                onUpdate={(updates) => setProject(prev => ({ ...prev, ...updates }))}
+              />
+            ) : (
           <div className="space-y-6">
             {highIntentSignals.length > 0 && (
               <div>
@@ -501,6 +566,8 @@ function ProjectContent({ params }) {
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </main>
 

@@ -16,7 +16,8 @@ const INTENT_COLORS = {
   low: 'border-l-[#71717a]',
 };
 
-function PipelineCard({ signal, outreach, onDragStart }) {
+function PipelineCard({ signal, outreach, onDragStart, onDelete }) {
+  const [showConfirm, setShowConfirm] = useState(false);
   const subreddit = signal.subreddit || signal.url?.match(/r\/(\w+)/)?.[1] || 'reddit';
   const title = signal.content?.split('\n')[0]?.slice(0, 50) || 'Untitled';
 
@@ -36,6 +37,27 @@ function PipelineCard({ signal, outreach, onDragStart }) {
   };
 
   const followUpStatus = getFollowUpStatus();
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    console.log('handleDelete called, showConfirm:', showConfirm, 'onDelete:', typeof onDelete);
+    
+    if (showConfirm) {
+      console.log('Attempting to delete signal:', signal.id);
+      if (onDelete) {
+        onDelete(signal.id);
+      } else {
+        console.error('onDelete is not defined!');
+      }
+      setShowConfirm(false);
+    } else {
+      setShowConfirm(true);
+      // Auto-hide confirm after 3 seconds
+      setTimeout(() => setShowConfirm(false), 3000);
+    }
+  };
 
   return (
     <div 
@@ -64,21 +86,35 @@ function PipelineCard({ signal, outreach, onDragStart }) {
           {signal.intent_score === 'high' && <span className="text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-[#22c55e]/20 text-[#22c55e]">HIGH</span>}
           {signal.intent_score === 'medium' && <span className="text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-500">MED</span>}
         </div>
-        <a 
-          href={signal.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-[9px] sm:text-[10px] text-[#22c55e] hover:underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          View →
-        </a>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleDelete}
+            className={`text-[9px] sm:text-[10px] transition-colors ${
+              showConfirm 
+                ? 'text-red-500 font-medium' 
+                : 'text-[#71717a] hover:text-red-400'
+            }`}
+            title={showConfirm ? 'Click again to confirm' : 'Delete'}
+          >
+            {showConfirm ? 'Sure?' : 'Delete'}
+          </button>
+          <a 
+            href={signal.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[9px] sm:text-[10px] text-[#22c55e] hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            View →
+          </a>
+        </div>
       </div>
     </div>
   );
 }
 
-export default function PipelineView({ signals, outreachMap, onUpdateOutreach }) {
+export default function PipelineView({ signals, outreachMap, onUpdateOutreach, onDelete }) {
   const [draggedSignalId, setDraggedSignalId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
   
@@ -183,7 +219,7 @@ export default function PipelineView({ signals, outreachMap, onUpdateOutreach })
               </div>
 
               {/* Cards */}
-              <div className="space-y-2 min-h-[100px] sm:min-h-[150px] max-h-[300px] sm:max-h-[400px] overflow-y-auto">
+              <div className="space-y-2 min-h-[100px] sm:min-h-[150px] max-h-[300px] sm:max-h-[400px] overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {stageSignals.length === 0 ? (
                   <div className={`flex items-center justify-center h-16 sm:h-20 border border-dashed ${isDragOver ? 'border-[#22c55e]' : 'border-[#27272a]'} rounded-lg transition-colors`}>
                     <p className="text-[8px] sm:text-[10px] text-[#71717a] text-center px-1">{isDragOver ? 'Drop' : 'Empty'}</p>
@@ -195,6 +231,7 @@ export default function PipelineView({ signals, outreachMap, onUpdateOutreach })
                       signal={signal}
                       outreach={outreachMap[signal.id]}
                       onDragStart={handleDragStart}
+                      onDelete={onDelete}
                     />
                   ))
                 )}

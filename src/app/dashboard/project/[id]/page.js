@@ -15,6 +15,7 @@ import MicroTasks from '@/components/MicroTasks';
 import Streaks from '@/components/Streaks';
 import AutoDiscovery from '@/components/AutoDiscovery';
 import ResponseTracker from '@/components/ResponseTracker';
+import LandingPageBuilder from '@/components/LandingPageBuilder';
 import { supabase } from '@/lib/supabase';
 
 function ProjectContent({ params }) {
@@ -31,7 +32,7 @@ function ProjectContent({ params }) {
   const [saving, setSaving] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [stats, setStats] = useState({ totalSignals: 0, contacted: 0, replied: 0, wouldPay: 0 });
-  const [activeTab, setActiveTab] = useState('pipeline');
+  const [activeTab, setActiveTab] = useState('landing');
 
   const exportToCSV = () => {
     const headers = [
@@ -365,12 +366,12 @@ function ProjectContent({ params }) {
           {/* Tabs */}
           <div className="flex gap-1 -mb-px overflow-x-auto">
             {[
-              { id: 'pipeline', label: 'Pipeline' },
-              { id: 'leads', label: 'Leads', count: stats.wouldPay },
-              { id: 'insights', label: 'Insights', emoji: '🧠' },
+              { id: 'landing', label: 'Page', emoji: '🏠' },
+              { id: 'posts', label: 'Posts', emoji: '✍️' },
               { id: 'responses', label: 'Responses', emoji: '📊' },
-              { id: 'list', label: 'List' },
-              { id: 'roadmap', label: 'Launch', emoji: '📅', locked: !isValidated },
+              { id: 'leads', label: 'Leads', emoji: '👥', count: stats.wouldPay },
+              { id: 'pipeline', label: 'Pipeline', emoji: '📋' },
+              { id: 'roadmap', label: 'Launch', emoji: '🚀', locked: !isValidated },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -484,12 +485,31 @@ function ProjectContent({ params }) {
             )}
 
             {/* Tab Content */}
-            {activeTab === 'pipeline' ? (
-              <PipelineView 
-                signals={signals}
-                outreachMap={outreachMap}
-                onUpdateOutreach={handleUpdateOutreach}
-                onDelete={handleDeleteSignal}
+            {activeTab === 'landing' ? (
+              <LandingPageBuilder
+                projectId={id}
+                projectName={project.name}
+                projectPain={project.pain_description}
+                targetAudience={project.target_audience}
+              />
+            ) : activeTab === 'posts' ? (
+              <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center">
+                <div className="w-20 h-20 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-4xl">✍️</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-3">Validation Posts</h2>
+                <p className="text-[#a1a1aa] mb-6 max-w-md mx-auto">
+                  AI generates Reddit & X post templates to validate your idea. Copy, post, and track responses.
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#22c55e]/10 border border-[#22c55e]/20 text-[#22c55e] text-sm font-medium">
+                  <span className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse" />
+                  Coming Soon
+                </div>
+              </div>
+            ) : activeTab === 'responses' ? (
+              <ResponseTracker
+                projectId={id}
+                projectName={project.name}
               />
             ) : activeTab === 'leads' ? (
               <ValidatedLeadsList
@@ -498,17 +518,12 @@ function ProjectContent({ params }) {
                 onUpdateOutreach={handleUpdateOutreach}
                 projectPain={project.pain_description}
               />
-            ) : activeTab === 'insights' ? (
-              <IdeaInsights
+            ) : activeTab === 'pipeline' ? (
+              <PipelineView 
                 signals={signals}
                 outreachMap={outreachMap}
-                projectName={project.name}
-                projectPain={project.pain_description}
-              />
-            ) : activeTab === 'responses' ? (
-              <ResponseTracker
-                projectId={id}
-                projectName={project.name}
+                onUpdateOutreach={handleUpdateOutreach}
+                onDelete={handleDeleteSignal}
               />
             ) : activeTab === 'roadmap' ? (
               <LaunchCalendar 
@@ -525,48 +540,10 @@ function ProjectContent({ params }) {
                 onUpdate={(updates) => setProject(prev => ({ ...prev, ...updates }))}
               />
             ) : (
-          <div className="space-y-6">
-            {highIntentSignals.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-[#22c55e] mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#22c55e] rounded-full" />
-                  High Intent ({highIntentSignals.length})
-                </h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {highIntentSignals.map(signal => (
-                    <SignalCard key={signal.id} signal={signal} outreach={outreachMap[signal.id]} onUpdateOutreach={handleUpdateOutreach} onDelete={handleDeleteSignal} projectPain={project.pain_description} />
-                  ))}
-                </div>
+              <div className="text-center text-[#71717a] py-12">
+                Select a tab to view content
               </div>
             )}
-            {mediumIntentSignals.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-yellow-500 mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-yellow-500 rounded-full" />
-                  Medium Intent ({mediumIntentSignals.length})
-                </h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {mediumIntentSignals.map(signal => (
-                    <SignalCard key={signal.id} signal={signal} outreach={outreachMap[signal.id]} onUpdateOutreach={handleUpdateOutreach} onDelete={handleDeleteSignal} projectPain={project.pain_description} />
-                  ))}
-                </div>
-              </div>
-            )}
-            {lowIntentSignals.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium text-[#71717a] mb-3 flex items-center gap-2">
-                  <span className="w-2 h-2 bg-[#71717a] rounded-full" />
-                  Low Intent ({lowIntentSignals.length})
-                </h3>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {lowIntentSignals.map(signal => (
-                    <SignalCard key={signal.id} signal={signal} outreach={outreachMap[signal.id]} onUpdateOutreach={handleUpdateOutreach} onDelete={handleDeleteSignal} projectPain={project.pain_description} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
           </>
         )}
       </main>

@@ -1,209 +1,255 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { FONTS, COLOR_PRESETS, GRADIENTS, SECTION_TYPES } from './templates';
+import SectionEditor from './SectionEditor';
 
-const COLOR_PRESETS = [
-  { name: 'Default Green', primary: '#22c55e', background: '#0a0a0b', card: '#161618' },
-  { name: 'Ocean Blue', primary: '#3b82f6', background: '#0a0a0b', card: '#161618' },
-  { name: 'Purple', primary: '#8b5cf6', background: '#0a0a0b', card: '#161618' },
-  { name: 'Orange', primary: '#f97316', background: '#0a0a0b', card: '#161618' },
-  { name: 'Pink', primary: '#ec4899', background: '#0a0a0b', card: '#161618' },
-  { name: 'Light Mode', primary: '#22c55e', background: '#ffffff', card: '#f4f4f5', text: '#18181b', muted: '#71717a' },
-];
+export default function LandingPageEditor({
+  landingPage,
+  updateLandingPage,
+  updateSection,
+  moveSection,
+  addSection,
+  deleteSection,
+  duplicateSection,
+  toggleSection,
+  selectedSection,
+  setSelectedSection,
+  onRegenerate,
+}) {
+  const [activePanel, setActivePanel] = useState('sections'); // sections, styles, settings
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [addSectionAfter, setAddSectionAfter] = useState(-1);
 
-export default function LandingPageEditor({ landingPage, onChange, onRegenerate, generating }) {
-  const [activeSection, setActiveSection] = useState('content');
-
-  const updateField = (field, value) => {
-    onChange({ ...landingPage, [field]: value });
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const updateColor = (colorKey, value) => {
-    onChange({
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+  };
+
+  const handleDrop = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    moveSection(draggedIndex, index);
+    setDraggedIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const updateGlobalStyle = (key, value) => {
+    updateLandingPage({
       ...landingPage,
-      colors: { ...landingPage.colors, [colorKey]: value },
+      globalStyles: { ...landingPage.globalStyles, [key]: value },
     });
   };
 
-  const updatePainPoint = (index, value) => {
-    const newPainPoints = [...landingPage.painPoints];
-    newPainPoints[index] = value;
-    onChange({ ...landingPage, painPoints: newPainPoints });
-  };
-
   const applyColorPreset = (preset) => {
-    onChange({
+    updateLandingPage({
       ...landingPage,
-      colors: {
-        ...landingPage.colors,
-        primary: preset.primary,
-        background: preset.background,
-        card: preset.card,
-        text: preset.text || '#fafafa',
-        muted: preset.muted || '#a1a1aa',
+      globalStyles: {
+        ...landingPage.globalStyles,
+        primaryColor: preset.primary,
+        backgroundColor: preset.background,
+        cardColor: preset.card,
+        textColor: preset.text,
+        mutedColor: preset.muted,
       },
     });
   };
 
+  const updateSocialLink = (key, value) => {
+    updateLandingPage({
+      ...landingPage,
+      socialLinks: { ...landingPage.socialLinks, [key]: value },
+    });
+  };
+
+  const updateMeta = (key, value) => {
+    updateLandingPage({
+      ...landingPage,
+      meta: { ...landingPage.meta, [key]: value },
+    });
+  };
+
   return (
-    <div className="grid lg:grid-cols-3 gap-6">
-      {/* Editor Panel */}
-      <div className="lg:col-span-2 space-y-6">
-        {/* Section Tabs */}
-        <div className="flex gap-2 flex-wrap">
+    <div className="grid lg:grid-cols-[300px_1fr] gap-4">
+      {/* Left Panel */}
+      <div className="space-y-4">
+        {/* Panel Tabs */}
+        <div className="bg-[#161618] border border-[#27272a] rounded-xl p-1 flex">
           {[
-            { id: 'content', label: 'Content', icon: '📝' },
-            { id: 'style', label: 'Colors & Style', icon: '🎨' },
+            { id: 'sections', label: 'Sections', icon: '📑' },
+            { id: 'styles', label: 'Styles', icon: '🎨' },
             { id: 'settings', label: 'Settings', icon: '⚙️' },
-          ].map(section => (
+          ].map(tab => (
             <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                activeSection === section.id
-                  ? 'bg-[#22c55e] text-[#0a0a0b]'
-                  : 'bg-[#161618] border border-[#27272a] text-[#a1a1aa] hover:text-white'
+              key={tab.id}
+              onClick={() => setActivePanel(tab.id)}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                activePanel === tab.id
+                  ? 'bg-[#27272a] text-white'
+                  : 'text-[#71717a] hover:text-white'
               }`}
             >
-              <span>{section.icon}</span>
-              {section.label}
+              <span>{tab.icon}</span>
+              {tab.label}
             </button>
           ))}
         </div>
 
-        {/* Content Section */}
-        {activeSection === 'content' && (
-          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold">Page Content</h3>
+        {/* Sections Panel */}
+        {activePanel === 'sections' && (
+          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-sm">Page Sections</h3>
               <button
-                onClick={onRegenerate}
-                disabled={generating}
-                className="text-sm text-[#22c55e] hover:text-[#16a34a] flex items-center gap-1"
+                onClick={() => {
+                  setAddSectionAfter(-1);
+                  setShowAddSection(true);
+                }}
+                className="text-xs text-[#22c55e] hover:text-[#16a34a]"
               >
-                {generating ? 'Generating...' : '✨ Regenerate with AI'}
+                + Add Section
               </button>
             </div>
 
-            {/* Headline */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Headline</label>
-              <input
-                type="text"
-                value={landingPage.headline}
-                onChange={(e) => updateField('headline', e.target.value)}
-                placeholder="Your compelling headline"
-                className="w-full px-4 py-3 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none text-lg"
-              />
-              <p className="text-xs text-[#71717a] mt-1">Make it clear and benefit-focused</p>
-            </div>
+            {/* Draggable Section List */}
+            <div className="space-y-2">
+              {landingPage.sections.map((section, index) => (
+                <div
+                  key={section.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => handleDrop(e, index)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => setSelectedSection(section.id)}
+                  className={`p-3 rounded-lg border transition-all cursor-pointer group ${
+                    selectedSection === section.id
+                      ? 'bg-[#22c55e]/10 border-[#22c55e]'
+                      : 'bg-[#0a0a0b] border-[#27272a] hover:border-[#3f3f46]'
+                  } ${draggedIndex === index ? 'opacity-50' : ''} ${
+                    !section.visible ? 'opacity-50' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Drag Handle */}
+                    <div className="text-[#71717a] cursor-grab active:cursor-grabbing">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+                      </svg>
+                    </div>
 
-            {/* Subheadline */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Subheadline</label>
-              <textarea
-                value={landingPage.subheadline}
-                onChange={(e) => updateField('subheadline', e.target.value)}
-                placeholder="Explain the value proposition in 1-2 sentences"
-                rows={2}
-                className="w-full px-4 py-3 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none resize-none"
-              />
-            </div>
+                    {/* Section Icon & Name */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">
+                          {SECTION_TYPES.find(t => t.type === section.type)?.icon || '📄'}
+                        </span>
+                        <span className="text-sm font-medium truncate">
+                          {SECTION_TYPES.find(t => t.type === section.type)?.name || section.type}
+                        </span>
+                      </div>
+                    </div>
 
-            {/* Pain Points */}
-            <div>
-              <label className="block text-sm font-medium mb-2">Pain Points / Benefits</label>
-              <div className="space-y-3">
-                {landingPage.painPoints.map((point, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <span className="text-[#22c55e]">✓</span>
-                    <input
-                      type="text"
-                      value={point}
-                      onChange={(e) => updatePainPoint(index, e.target.value)}
-                      placeholder={`Benefit ${index + 1}`}
-                      className="flex-1 px-4 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none"
-                    />
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSection(section.id);
+                        }}
+                        className="p-1 hover:bg-[#27272a] rounded"
+                        title={section.visible ? 'Hide' : 'Show'}
+                      >
+                        {section.visible ? '👁️' : '🙈'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          duplicateSection(section.id);
+                        }}
+                        className="p-1 hover:bg-[#27272a] rounded"
+                        title="Duplicate"
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSection(section.id);
+                        }}
+                        className="p-1 hover:bg-red-500/20 rounded text-red-400"
+                        title="Delete"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <button
-                onClick={() => updateField('painPoints', [...landingPage.painPoints, ''])}
-                className="mt-3 text-sm text-[#22c55e] hover:text-[#16a34a]"
-              >
-                + Add another point
-              </button>
+                </div>
+              ))}
             </div>
 
-            {/* CTA */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Button Text</label>
-                <input
-                  type="text"
-                  value={landingPage.ctaText}
-                  onChange={(e) => updateField('ctaText', e.target.value)}
-                  placeholder="Join Waitlist"
-                  className="w-full px-4 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Button Subtext</label>
-                <input
-                  type="text"
-                  value={landingPage.ctaSubtext}
-                  onChange={(e) => updateField('ctaSubtext', e.target.value)}
-                  placeholder="No spam, unsubscribe anytime"
-                  className="w-full px-4 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Social Proof */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium">Social Proof</label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={landingPage.showSocialProof}
-                    onChange={(e) => updateField('showSocialProof', e.target.checked)}
-                    className="w-4 h-4 rounded border-[#27272a] bg-[#0a0a0b] text-[#22c55e] focus:ring-[#22c55e]"
-                  />
-                  <span className="text-sm text-[#a1a1aa]">Show on page</span>
-                </label>
-              </div>
-              <input
-                type="text"
-                value={landingPage.socialProof}
-                onChange={(e) => updateField('socialProof', e.target.value)}
-                placeholder="e.g., Join 50+ founders already validating"
-                className="w-full px-4 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] focus:border-[#22c55e] outline-none"
-              />
-            </div>
+            {/* Add Section Button */}
+            <button
+              onClick={() => {
+                setAddSectionAfter(landingPage.sections.length - 1);
+                setShowAddSection(true);
+              }}
+              className="w-full p-3 rounded-lg border-2 border-dashed border-[#27272a] hover:border-[#22c55e] text-[#71717a] hover:text-[#22c55e] transition-colors text-sm"
+            >
+              + Add Section
+            </button>
           </div>
         )}
 
-        {/* Style Section */}
-        {activeSection === 'style' && (
-          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6 space-y-6">
-            <h3 className="text-lg font-bold">Colors & Style</h3>
+        {/* Styles Panel */}
+        {activePanel === 'styles' && (
+          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-4 space-y-6 max-h-[600px] overflow-y-auto">
+            {/* Font */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Font Family</label>
+              <div className="grid grid-cols-2 gap-2">
+                {FONTS.map(font => (
+                  <button
+                    key={font.value}
+                    onClick={() => updateGlobalStyle('font', font.value)}
+                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                      landingPage.globalStyles.font === font.value
+                        ? 'bg-[#22c55e] text-[#0a0a0b]'
+                        : 'bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e]'
+                    }`}
+                    style={{ fontFamily: font.value }}
+                  >
+                    {font.name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Color Presets */}
             <div>
-              <label className="block text-sm font-medium mb-3">Quick Presets</label>
+              <label className="block text-sm font-medium mb-2">Color Presets</label>
               <div className="flex flex-wrap gap-2">
-                {COLOR_PRESETS.map((preset, index) => (
+                {COLOR_PRESETS.map((preset, i) => (
                   <button
-                    key={index}
+                    key={i}
                     onClick={() => applyColorPreset(preset)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e] transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e] transition-colors"
+                    title={preset.name}
                   >
                     <div
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: preset.primary }}
                     />
-                    <span className="text-sm">{preset.name}</span>
+                    <span className="text-xs">{preset.name}</span>
                   </button>
                 ))}
               </div>
@@ -211,134 +257,226 @@ export default function LandingPageEditor({ landingPage, onChange, onRegenerate,
 
             {/* Custom Colors */}
             <div>
-              <label className="block text-sm font-medium mb-3">Custom Colors</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <label className="block text-sm font-medium mb-2">Custom Colors</label>
+              <div className="space-y-3">
                 {[
-                  { key: 'primary', label: 'Primary / CTA' },
-                  { key: 'background', label: 'Background' },
-                  { key: 'card', label: 'Card Background' },
-                  { key: 'text', label: 'Text' },
-                  { key: 'muted', label: 'Muted Text' },
-                  { key: 'border', label: 'Borders' },
+                  { key: 'primaryColor', label: 'Primary' },
+                  { key: 'backgroundColor', label: 'Background' },
+                  { key: 'cardColor', label: 'Card' },
+                  { key: 'textColor', label: 'Text' },
+                  { key: 'mutedColor', label: 'Muted' },
+                  { key: 'borderColor', label: 'Border' },
                 ].map(color => (
-                  <div key={color.key}>
-                    <label className="block text-xs text-[#71717a] mb-1">{color.label}</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={landingPage.colors[color.key]}
-                        onChange={(e) => updateColor(color.key, e.target.value)}
-                        className="w-10 h-10 rounded-lg border border-[#27272a] cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={landingPage.colors[color.key]}
-                        onChange={(e) => updateColor(color.key, e.target.value)}
-                        className="flex-1 px-2 py-1 rounded bg-[#0a0a0b] border border-[#27272a] text-xs font-mono"
-                      />
-                    </div>
+                  <div key={color.key} className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={landingPage.globalStyles[color.key]}
+                      onChange={(e) => updateGlobalStyle(color.key, e.target.value)}
+                      className="w-8 h-8 rounded cursor-pointer border border-[#27272a]"
+                    />
+                    <span className="text-xs text-[#a1a1aa] flex-1">{color.label}</span>
+                    <input
+                      type="text"
+                      value={landingPage.globalStyles[color.key]}
+                      onChange={(e) => updateGlobalStyle(color.key, e.target.value)}
+                      className="w-20 px-2 py-1 rounded bg-[#0a0a0b] border border-[#27272a] text-xs font-mono"
+                    />
                   </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Border Radius */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Border Radius</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'sharp', label: 'Sharp', preview: 'rounded-none' },
+                  { value: 'rounded', label: 'Rounded', preview: 'rounded-lg' },
+                  { value: 'pill', label: 'Pill', preview: 'rounded-full' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateGlobalStyle('borderRadius', option.value)}
+                    className={`flex-1 px-3 py-2 text-xs transition-colors ${
+                      landingPage.globalStyles.borderRadius === option.value
+                        ? 'bg-[#22c55e] text-[#0a0a0b]'
+                        : 'bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e]'
+                    } ${option.preview}`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Spacing */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Spacing</label>
+              <div className="flex gap-2">
+                {[
+                  { value: 'compact', label: 'Compact' },
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'spacious', label: 'Spacious' },
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => updateGlobalStyle('spacing', option.value)}
+                    className={`flex-1 px-3 py-2 rounded-lg text-xs transition-colors ${
+                      landingPage.globalStyles.spacing === option.value
+                        ? 'bg-[#22c55e] text-[#0a0a0b]'
+                        : 'bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e]'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Background Gradient */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Background Effect</label>
+              <div className="space-y-2">
+                {GRADIENTS.map((gradient, i) => (
+                  <button
+                    key={i}
+                    onClick={() => updateGlobalStyle('backgroundGradient', gradient.value)}
+                    className={`w-full px-3 py-2 rounded-lg text-xs text-left transition-colors ${
+                      landingPage.globalStyles.backgroundGradient === gradient.value
+                        ? 'bg-[#22c55e] text-[#0a0a0b]'
+                        : 'bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e]'
+                    }`}
+                  >
+                    {gradient.name}
+                  </button>
                 ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* Settings Section */}
-        {activeSection === 'settings' && (
-          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6 space-y-6">
-            <h3 className="text-lg font-bold">Page Settings</h3>
-
-            {/* Toggle Sections */}
-            <div className="space-y-4">
-              <label className="flex items-center justify-between p-4 rounded-lg bg-[#0a0a0b] border border-[#27272a] cursor-pointer hover:border-[#22c55e] transition-colors">
+        {/* Settings Panel */}
+        {activePanel === 'settings' && (
+          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-4 space-y-6 max-h-[600px] overflow-y-auto">
+            {/* Meta */}
+            <div>
+              <label className="block text-sm font-medium mb-2">SEO & Meta</label>
+              <div className="space-y-3">
                 <div>
-                  <div className="font-medium">Show Pain Points</div>
-                  <div className="text-sm text-[#71717a]">Display the benefit bullets</div>
+                  <label className="block text-xs text-[#71717a] mb-1">Page Title</label>
+                  <input
+                    type="text"
+                    value={landingPage.meta?.title || ''}
+                    onChange={(e) => updateMeta('title', e.target.value)}
+                    placeholder="My Awesome Product"
+                    className="w-full px-3 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] text-sm focus:border-[#22c55e] outline-none"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={landingPage.showPainPoints}
-                  onChange={(e) => updateField('showPainPoints', e.target.checked)}
-                  className="w-5 h-5 rounded border-[#27272a] bg-[#0a0a0b] text-[#22c55e] focus:ring-[#22c55e]"
-                />
-              </label>
-
-              <label className="flex items-center justify-between p-4 rounded-lg bg-[#0a0a0b] border border-[#27272a] cursor-pointer hover:border-[#22c55e] transition-colors">
                 <div>
-                  <div className="font-medium">Show Social Proof</div>
-                  <div className="text-sm text-[#71717a]">Display the social proof text</div>
+                  <label className="block text-xs text-[#71717a] mb-1">Description</label>
+                  <textarea
+                    value={landingPage.meta?.description || ''}
+                    onChange={(e) => updateMeta('description', e.target.value)}
+                    placeholder="A brief description for search engines"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] text-sm focus:border-[#22c55e] outline-none resize-none"
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  checked={landingPage.showSocialProof}
-                  onChange={(e) => updateField('showSocialProof', e.target.checked)}
-                  className="w-5 h-5 rounded border-[#27272a] bg-[#0a0a0b] text-[#22c55e] focus:ring-[#22c55e]"
-                />
-              </label>
+              </div>
+            </div>
+
+            {/* Social Links */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Social Links</label>
+              <div className="space-y-3">
+                {[
+                  { key: 'twitter', label: 'Twitter/X', placeholder: 'https://twitter.com/you' },
+                  { key: 'github', label: 'GitHub', placeholder: 'https://github.com/you' },
+                  { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/you' },
+                  { key: 'website', label: 'Website', placeholder: 'https://yoursite.com' },
+                ].map(social => (
+                  <div key={social.key}>
+                    <label className="block text-xs text-[#71717a] mb-1">{social.label}</label>
+                    <input
+                      type="url"
+                      value={landingPage.socialLinks?.[social.key] || ''}
+                      onChange={(e) => updateSocialLink(social.key, e.target.value)}
+                      placeholder={social.placeholder}
+                      className="w-full px-3 py-2 rounded-lg bg-[#0a0a0b] border border-[#27272a] text-sm focus:border-[#22c55e] outline-none"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Danger Zone */}
-            <div className="pt-6 border-t border-[#27272a]">
-              <h4 className="text-sm font-medium text-red-400 mb-3">Danger Zone</h4>
+            <div className="pt-4 border-t border-[#27272a]">
+              <label className="block text-sm font-medium text-red-400 mb-3">Danger Zone</label>
               <button
-                onClick={() => {
-                  if (confirm('Are you sure you want to reset the landing page? This cannot be undone.')) {
-                    onRegenerate();
-                  }
-                }}
-                className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/20 transition-colors"
+                onClick={onRegenerate}
+                className="w-full px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/20 transition-colors"
               >
-                Reset & Regenerate
+                🔄 Reset & Choose New Template
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Live Mini Preview */}
-      <div className="hidden lg:block">
-        <div className="sticky top-6">
-          <div className="bg-[#161618] border border-[#27272a] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs text-[#71717a]">Live Preview</span>
-              <span className="text-xs text-[#22c55e]">● Auto-updating</span>
+      {/* Right Panel - Section Editor */}
+      <div className="bg-[#161618] border border-[#27272a] rounded-xl p-4">
+        {selectedSection ? (
+          <SectionEditor
+            section={landingPage.sections.find(s => s.id === selectedSection)}
+            updateSection={(updates) => updateSection(selectedSection, updates)}
+            globalStyles={landingPage.globalStyles}
+          />
+        ) : (
+          <div className="h-full flex items-center justify-center text-center p-8">
+            <div>
+              <div className="text-4xl mb-4">👈</div>
+              <h3 className="font-medium mb-2">Select a Section</h3>
+              <p className="text-sm text-[#71717a]">
+                Click on a section in the left panel to edit its content
+              </p>
             </div>
-            <div 
-              className="rounded-lg overflow-hidden border border-[#27272a]"
-              style={{ 
-                backgroundColor: landingPage.colors.background,
-                aspectRatio: '9/16',
-                maxHeight: '400px',
-              }}
-            >
-              <div className="p-4 h-full flex flex-col justify-center text-center transform scale-[0.6] origin-center">
-                <h1 
-                  className="text-lg font-bold mb-2 leading-tight"
-                  style={{ color: landingPage.colors.text }}
-                >
-                  {landingPage.headline || 'Your Headline'}
-                </h1>
-                <p 
-                  className="text-xs mb-4"
-                  style={{ color: landingPage.colors.muted }}
-                >
-                  {landingPage.subheadline || 'Your subheadline goes here'}
-                </p>
+          </div>
+        )}
+      </div>
+
+      {/* Add Section Modal */}
+      {showAddSection && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#161618] border border-[#27272a] rounded-2xl max-w-2xl w-full">
+            <div className="p-4 border-b border-[#27272a] flex justify-between items-center">
+              <h2 className="font-bold">Add Section</h2>
+              <button
+                onClick={() => setShowAddSection(false)}
+                className="p-2 hover:bg-[#27272a] rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {SECTION_TYPES.map(section => (
                 <button
-                  className="px-4 py-2 rounded-lg text-xs font-bold mx-auto"
-                  style={{ 
-                    backgroundColor: landingPage.colors.primary,
-                    color: landingPage.colors.background,
+                  key={section.type}
+                  onClick={() => {
+                    addSection(section.type, addSectionAfter);
+                    setShowAddSection(false);
                   }}
+                  className="p-4 rounded-xl bg-[#0a0a0b] border border-[#27272a] hover:border-[#22c55e] transition-colors text-left"
                 >
-                  {landingPage.ctaText || 'Join Waitlist'}
+                  <div className="text-2xl mb-2">{section.icon}</div>
+                  <div className="font-medium text-sm">{section.name}</div>
+                  <div className="text-xs text-[#71717a]">{section.description}</div>
                 </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

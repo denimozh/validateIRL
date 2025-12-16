@@ -3,11 +3,11 @@
 import { useState, useRef } from 'react';
 
 const PIPELINE_STAGES = [
-  { id: 'found', label: 'Found', emoji: '🎯', color: 'border-[#71717a]', bg: 'bg-[#71717a]/10' },
-  { id: 'contacted', label: 'Contacted', emoji: '📤', color: 'border-blue-500', bg: 'bg-blue-500/10' },
-  { id: 'replied', label: 'Replied', emoji: '💬', color: 'border-yellow-500', bg: 'bg-yellow-500/10' },
-  { id: 'interested', label: 'Interested', emoji: '👀', color: 'border-orange-500', bg: 'bg-orange-500/10' },
-  { id: 'would_pay', label: "I'd Pay", emoji: '💰', color: 'border-[#22c55e]', bg: 'bg-[#22c55e]/10' },
+  { id: 'found', label: 'Saved', emoji: '📌', color: 'border-[#71717a]', bg: 'bg-[#71717a]/10' },
+  { id: 'contacted', label: 'Reached Out', emoji: '📤', color: 'border-blue-500', bg: 'bg-blue-500/10' },
+  { id: 'replied', label: 'Engaged', emoji: '💬', color: 'border-yellow-500', bg: 'bg-yellow-500/10' },
+  { id: 'interested', label: 'Interested', emoji: '🔥', color: 'border-orange-500', bg: 'bg-orange-500/10' },
+  { id: 'would_pay', label: 'Converted', emoji: '✅', color: 'border-[#22c55e]', bg: 'bg-[#22c55e]/10' },
 ];
 
 const INTENT_COLORS = {
@@ -42,14 +42,9 @@ function PipelineCard({ signal, outreach, onDragStart, onDelete }) {
     e.stopPropagation();
     e.preventDefault();
     
-    console.log('handleDelete called, showConfirm:', showConfirm, 'onDelete:', typeof onDelete);
-    
     if (showConfirm) {
-      console.log('Attempting to delete signal:', signal.id);
       if (onDelete) {
         onDelete(signal.id);
-      } else {
-        console.error('onDelete is not defined!');
       }
       setShowConfirm(false);
     } else {

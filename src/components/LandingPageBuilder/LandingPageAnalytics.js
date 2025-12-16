@@ -13,6 +13,7 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
   const [signups, setSignups] = useState([]);
   const [viewsOverTime, setViewsOverTime] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState('7d');
 
   useEffect(() => {
     if (isPublished) {
@@ -20,17 +21,22 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
     } else {
       setLoading(false);
     }
-  }, [projectId, isPublished]);
+  }, [projectId, isPublished, timeRange]);
 
   const loadAnalytics = async () => {
     try {
+      const daysBack = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : 90;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+
       // Get page views
       const { data: views, count: viewCount } = await supabase
         .from('landing_page_views')
         .select('*', { count: 'exact' })
-        .eq('project_id', projectId);
+        .eq('project_id', projectId)
+        .gte('created_at', startDate.toISOString());
 
-      // Get unique visitors (by IP or fingerprint - simplified as count of unique dates)
+      // Calculate unique visitors by date
       const uniqueDates = new Set(views?.map(v => v.created_at?.split('T')[0])).size;
 
       // Get signups
@@ -40,17 +46,17 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
 
-      // Calculate views over time (last 7 days)
-      const last7Days = [];
-      for (let i = 6; i >= 0; i--) {
+      // Calculate views over time
+      const viewsByDay = [];
+      for (let i = daysBack - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
         const dayViews = views?.filter(v => v.created_at?.startsWith(dateStr)).length || 0;
         const daySignups = signupData?.filter(s => s.created_at?.startsWith(dateStr)).length || 0;
-        last7Days.push({
+        viewsByDay.push({
           date: dateStr,
-          label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           views: dayViews,
           signups: daySignups,
         });
@@ -63,7 +69,7 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
         conversionRate: viewCount > 0 ? ((signupCount / viewCount) * 100).toFixed(1) : 0,
       });
       setSignups(signupData || []);
-      setViewsOverTime(last7Days);
+      setViewsOverTime(viewsByDay);
     } catch (error) {
       console.error('Error loading analytics:', error);
     } finally {
@@ -87,7 +93,7 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `signups-${slug}.csv`;
+    a.download = `signups-${slug}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -118,21 +124,44 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
 
   return (
     <div className="space-y-6">
+      {/* Time Range Selector */}
+      <div className="flex justify-end">
+        <div className="flex gap-1 bg-[#161618] border border-[#27272a] rounded-lg p-1">
+          {[
+            { value: '7d', label: '7 Days' },
+            { value: '30d', label: '30 Days' },
+            { value: '90d', label: '90 Days' },
+          ].map(range => (
+            <button
+              key={range.value}
+              onClick={() => setTimeRange(range.value)}
+              className={`px-3 py-1.5 rounded-md text-sm ${
+                timeRange === range.value
+                  ? 'bg-[#27272a] text-white'
+                  : 'text-[#71717a] hover:text-white'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Views', value: analytics.totalViews, icon: '👁️', color: '#22c55e' },
-          { label: 'Unique Visitors', value: analytics.uniqueVisitors, icon: '👤', color: '#3b82f6' },
-          { label: 'Signups', value: analytics.signups, icon: '✉️', color: '#8b5cf6' },
-          { label: 'Conversion Rate', value: `${analytics.conversionRate}%`, icon: '📈', color: '#f97316' },
+          { label: 'Total Views', value: analytics.totalViews, icon: '👁️', color: '#22c55e', change: null },
+          { label: 'Unique Visitors', value: analytics.uniqueVisitors, icon: '👤', color: '#3b82f6', change: null },
+          { label: 'Signups', value: analytics.signups, icon: '✉️', color: '#8b5cf6', change: null },
+          { label: 'Conversion', value: `${analytics.conversionRate}%`, icon: '📈', color: '#f97316', change: null },
         ].map((stat, index) => (
           <div
             key={index}
             className="bg-[#161618] border border-[#27272a] rounded-xl p-5"
           >
-            <div className="flex items-center gap-2 mb-2">
-              <span>{stat.icon}</span>
+            <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-[#71717a]">{stat.label}</span>
+              <span>{stat.icon}</span>
             </div>
             <div className="text-3xl font-bold" style={{ color: stat.color }}>
               {stat.value}
@@ -143,30 +172,68 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
 
       {/* Views Chart */}
       <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6">
-        <h3 className="text-lg font-bold mb-6">Last 7 Days</h3>
-        <div className="flex items-end gap-2 h-40">
-          {viewsOverTime.map((day, index) => (
-            <div key={index} className="flex-1 flex flex-col items-center gap-2">
-              <div className="w-full flex flex-col items-center gap-1" style={{ height: '120px' }}>
-                {/* Views bar */}
-                <div
-                  className="w-full rounded-t transition-all"
-                  style={{
-                    height: `${(day.views / maxViews) * 100}%`,
-                    backgroundColor: '#22c55e',
-                    minHeight: day.views > 0 ? '4px' : '0',
-                  }}
-                />
-              </div>
-              <div className="text-xs text-[#71717a]">{day.label}</div>
-              <div className="text-xs font-medium">{day.views}</div>
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="font-bold">Views Over Time</h3>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-[#22c55e]" />
+              <span className="text-[#71717a]">Views</span>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-[#8b5cf6]" />
+              <span className="text-[#71717a]">Signups</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#27272a]">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-[#22c55e]" />
-            <span className="text-xs text-[#71717a]">Page Views</span>
+
+        {/* Chart */}
+        <div className="h-48">
+          <div className="flex items-end gap-1 h-40">
+            {viewsOverTime.map((day, index) => {
+              const showLabel = viewsOverTime.length <= 14 || index % Math.ceil(viewsOverTime.length / 14) === 0;
+              return (
+                <div key={index} className="flex-1 flex flex-col items-center gap-1 group relative">
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+                    <div className="bg-[#27272a] rounded-lg px-3 py-2 text-xs whitespace-nowrap">
+                      <div className="font-medium">{day.label}</div>
+                      <div className="text-[#22c55e]">{day.views} views</div>
+                      <div className="text-[#8b5cf6]">{day.signups} signups</div>
+                    </div>
+                  </div>
+
+                  {/* Bars */}
+                  <div className="w-full flex gap-0.5 items-end" style={{ height: '140px' }}>
+                    <div
+                      className="flex-1 bg-[#22c55e] rounded-t transition-all hover:opacity-80"
+                      style={{
+                        height: `${(day.views / maxViews) * 100}%`,
+                        minHeight: day.views > 0 ? '4px' : '0',
+                      }}
+                    />
+                    <div
+                      className="flex-1 bg-[#8b5cf6] rounded-t transition-all hover:opacity-80"
+                      style={{
+                        height: `${(day.signups / Math.max(...viewsOverTime.map(d => d.signups), 1)) * 100}%`,
+                        minHeight: day.signups > 0 ? '4px' : '0',
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* X-axis labels */}
+          <div className="flex gap-1 mt-2">
+            {viewsOverTime.map((day, index) => {
+              const showLabel = viewsOverTime.length <= 14 || index % Math.ceil(viewsOverTime.length / 14) === 0;
+              return (
+                <div key={index} className="flex-1 text-center">
+                  {showLabel && <span className="text-[10px] text-[#71717a]">{day.label}</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -174,34 +241,41 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
       {/* Signups List */}
       <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold">Waitlist Signups</h3>
+          <h3 className="font-bold">Waitlist Signups ({signups.length})</h3>
           {signups.length > 0 && (
             <button
               onClick={exportSignups}
-              className="px-4 py-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-sm font-medium transition-colors"
+              className="px-4 py-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] text-sm font-medium transition-colors"
             >
-              Export CSV
+              📥 Export CSV
             </button>
           )}
         </div>
 
         {signups.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-4xl mb-3">📭</div>
-            <p className="text-[#71717a]">No signups yet</p>
-            <p className="text-sm text-[#71717a] mt-1">Share your landing page to start collecting emails</p>
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">📭</div>
+            <h4 className="font-medium mb-2">No signups yet</h4>
+            <p className="text-sm text-[#71717a] max-w-sm mx-auto">
+              Share your landing page on social media, Reddit, or relevant communities to start collecting emails.
+            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {signups.slice(0, 10).map((signup, index) => (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {signups.map((signup, index) => (
               <div
                 key={index}
                 className="flex items-center justify-between p-4 rounded-lg bg-[#0a0a0b] border border-[#27272a]"
               >
-                <div>
-                  <div className="font-medium">{signup.email}</div>
-                  <div className="text-xs text-[#71717a]">
-                    {signup.referrer ? `From: ${signup.referrer}` : 'Direct visit'}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#22c55e]/20 flex items-center justify-center text-[#22c55e]">
+                    {signup.email?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div>
+                    <div className="font-medium">{signup.email}</div>
+                    <div className="text-xs text-[#71717a]">
+                      {signup.referrer ? `From: ${signup.referrer}` : 'Direct visit'}
+                    </div>
                   </div>
                 </div>
                 <div className="text-sm text-[#71717a]">
@@ -209,31 +283,27 @@ export default function LandingPageAnalytics({ projectId, isPublished, slug }) {
                 </div>
               </div>
             ))}
-            {signups.length > 10 && (
-              <p className="text-center text-sm text-[#71717a] py-2">
-                And {signups.length - 10} more... Export CSV to see all.
-              </p>
-            )}
           </div>
         )}
       </div>
 
-      {/* Traffic Sources */}
+      {/* Share Tips */}
       <div className="bg-[#161618] border border-[#27272a] rounded-xl p-6">
-        <h3 className="text-lg font-bold mb-6">Where to Share</h3>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <h3 className="font-bold mb-4">📢 Where to Share</h3>
+        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { name: 'Reddit', icon: '🔴', tip: 'Post in relevant subreddits' },
-            { name: 'Twitter/X', icon: '🐦', tip: 'Share with your audience' },
-            { name: 'Communities', icon: '👥', tip: 'Slack, Discord, forums' },
-          ].map((source, index) => (
+            { name: 'Reddit', icon: '🔴', communities: 'r/SideProject, r/startups, niche subreddits' },
+            { name: 'Twitter/X', icon: '🐦', communities: 'Build in public, founder communities' },
+            { name: 'Indie Hackers', icon: '👨‍💻', communities: 'Product launches, milestones' },
+            { name: 'Hacker News', icon: '🟧', communities: 'Show HN posts' },
+          ].map((platform, index) => (
             <div
               key={index}
               className="p-4 rounded-lg bg-[#0a0a0b] border border-[#27272a]"
             >
-              <div className="text-2xl mb-2">{source.icon}</div>
-              <div className="font-medium mb-1">{source.name}</div>
-              <div className="text-xs text-[#71717a]">{source.tip}</div>
+              <div className="text-2xl mb-2">{platform.icon}</div>
+              <div className="font-medium mb-1">{platform.name}</div>
+              <div className="text-xs text-[#71717a]">{platform.communities}</div>
             </div>
           ))}
         </div>

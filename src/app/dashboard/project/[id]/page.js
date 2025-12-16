@@ -16,6 +16,7 @@ import Streaks from '@/components/Streaks';
 import AutoDiscovery from '@/components/AutoDiscovery';
 import ResponseTracker from '@/components/ResponseTracker';
 import LandingPageBuilder from '@/components/LandingPageBuilder';
+import PostTracker from '@/components/PostTracker';
 import { supabase } from '@/lib/supabase';
 
 function ProjectContent({ params }) {
@@ -31,8 +32,9 @@ function ProjectContent({ params }) {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
-  const [stats, setStats] = useState({ totalSignals: 0, contacted: 0, replied: 0, wouldPay: 0 });
+  const [stats, setStats] = useState({ totalSignals: 0, contacted: 0, replied: 0, wouldPay: 0, landingPageSignups: 0 });
   const [activeTab, setActiveTab] = useState('landing');
+  const SIGNUP_GOAL = 5; // Number of signups needed to unlock launch roadmap
 
   const exportToCSV = () => {
     const headers = [
@@ -139,11 +141,18 @@ function ProjectContent({ params }) {
       }
       setOutreachMap(outreach);
 
+      // Fetch landing page signups count
+      const { count: signupCount } = await supabase
+        .from('landing_page_signups')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', id);
+
       setStats({
         totalSignals: signalsData?.length || 0,
         contacted: outreachData?.filter(o => o.status !== 'found').length || 0,
         replied: outreachData?.filter(o => ['replied', 'interested', 'would_pay'].includes(o.status)).length || 0,
         wouldPay: outreachData?.filter(o => o.status === 'would_pay').length || 0,
+        landingPageSignups: signupCount || 0,
       });
     } catch (error) {
       console.error('Error fetching signals:', error);
@@ -226,8 +235,8 @@ function ProjectContent({ params }) {
 
   if (!project) return null;
 
-  const validationProgress = Math.min((stats.wouldPay / 3) * 100, 100);
-  const isValidated = stats.wouldPay >= 3;
+  const validationProgress = Math.min((stats.landingPageSignups / SIGNUP_GOAL) * 100, 100);
+  const isValidated = stats.landingPageSignups >= SIGNUP_GOAL;
 
   // Calculate follow-ups due
   const today = new Date();
@@ -283,7 +292,7 @@ function ProjectContent({ params }) {
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
                 isValidated ? 'bg-[#22c55e]/20 text-[#22c55e]' : 'bg-yellow-500/20 text-yellow-500'
               }`}>
-                {isValidated ? '✓ Validated' : `${stats.wouldPay}/3`}
+                {isValidated ? '✓ Validated' : `${stats.landingPageSignups}/${SIGNUP_GOAL} signups`}
               </span>
             </div>
 
@@ -342,9 +351,9 @@ function ProjectContent({ params }) {
               <span className="text-[#71717a] hidden sm:inline">replied</span>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              <span>💰</span>
-              <span className={`font-medium ${isValidated ? 'text-[#22c55e]' : ''}`}>{stats.wouldPay}</span>
-              <span className="text-[#71717a] hidden sm:inline">&quot;I&apos;d pay&quot;</span>
+              <span>✉️</span>
+              <span className={`font-medium ${isValidated ? 'text-[#22c55e]' : ''}`}>{stats.landingPageSignups}</span>
+              <span className="text-[#71717a] hidden sm:inline">signups</span>
             </div>
             
             {!isValidated && (
@@ -357,7 +366,7 @@ function ProjectContent({ params }) {
                       style={{ width: `${validationProgress}%` }}
                     />
                   </div>
-                  <span className="text-xs text-[#71717a]">{3 - stats.wouldPay} to go</span>
+                  <span className="text-xs text-[#71717a]">{SIGNUP_GOAL - stats.landingPageSignups} to go</span>
                 </div>
               </>
             )}
@@ -369,7 +378,7 @@ function ProjectContent({ params }) {
               { id: 'landing', label: 'Page', emoji: '🏠' },
               { id: 'posts', label: 'Posts', emoji: '✍️' },
               { id: 'responses', label: 'Responses', emoji: '📊' },
-              { id: 'leads', label: 'Leads', emoji: '👥', count: stats.wouldPay },
+              { id: 'leads', label: 'Leads', emoji: '👥', count: stats.landingPageSignups },
               { id: 'pipeline', label: 'Pipeline', emoji: '📋' },
               { id: 'roadmap', label: 'Launch', emoji: '🚀', locked: !isValidated },
             ].map(tab => (
@@ -406,7 +415,7 @@ function ProjectContent({ params }) {
               <span className="text-xl flex-shrink-0">🎉</span>
               <div className="min-w-0">
                 <p className="font-medium text-[#22c55e]">You&apos;re validated!</p>
-                <p className="text-sm text-[#a1a1aa] truncate">{stats.wouldPay} people said they&apos;d pay. Time to launch.</p>
+                <p className="text-sm text-[#a1a1aa] truncate">{stats.landingPageSignups} people signed up. Time to launch.</p>
               </div>
             </div>
             <button
@@ -443,108 +452,101 @@ function ProjectContent({ params }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Auto Discovery */}
-        <div className="mb-6">
-          <AutoDiscovery
+        {/* Tab Content - Always show, no signal requirement */}
+        {activeTab === 'landing' ? (
+          <LandingPageBuilder
             projectId={id}
             projectName={project.name}
-            painDescription={project.pain_description}
-            isEnabled={project.auto_discovery_enabled}
-            lastDiscoveryAt={project.last_discovery_at}
-            onNewSignals={(newSignals) => {
-              setSignals(prev => [...newSignals, ...prev]);
-            }}
-            onToggle={(enabled) => {
-              setProject(prev => ({ ...prev, auto_discovery_enabled: enabled }));
-            }}
+            projectPain={project.pain_description}
+            targetAudience={project.target_audience}
           />
-        </div>
-
-        {signals.length === 0 ? (
-          <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center max-w-md mx-auto">
-            <div className="w-16 h-16 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-3xl">🎯</span>
-            </div>
-            <h2 className="text-xl font-bold mb-2">No signals yet</h2>
-            <p className="text-[#a1a1aa] mb-6">Find Reddit posts where people express your pain point</p>
-            <button 
-              onClick={() => setShowSearchModal(true)}
-              className="px-6 py-3 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-bold transition-colors"
-            >
-              + Add Your First Signal
-            </button>
-          </div>
-        ) : (
+        ) : activeTab === 'posts' ? (
+          <PostTracker
+            projectId={id}
+            landingPageSlug={project.landing_page_published ? project.landing_page_slug : null}
+          />
+        ) : activeTab === 'responses' ? (
+          <ResponseTracker
+            projectId={id}
+            projectName={project.name}
+          />
+        ) : activeTab === 'leads' ? (
+          <ValidatedLeadsList
+            projectId={id}
+            signals={signals}
+            outreachMap={outreachMap}
+            onUpdateOutreach={handleUpdateOutreach}
+            projectPain={project.pain_description}
+          />
+        ) : activeTab === 'pipeline' ? (
           <>
-            {/* Widgets Row - Only show on Pipeline tab */}
-            {activeTab === 'pipeline' && (
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <MicroTasks signals={signals} outreachMap={outreachMap} />
-                <Streaks signals={signals} outreachMap={outreachMap} projectCreatedAt={project.created_at} />
-              </div>
-            )}
-
-            {/* Tab Content */}
-            {activeTab === 'landing' ? (
-              <LandingPageBuilder
+            {/* Auto Discovery - Only show on Pipeline tab */}
+            <div className="mb-6">
+              <AutoDiscovery
                 projectId={id}
                 projectName={project.name}
-                projectPain={project.pain_description}
-                targetAudience={project.target_audience}
+                painDescription={project.pain_description}
+                isEnabled={project.auto_discovery_enabled}
+                lastDiscoveryAt={project.last_discovery_at}
+                onNewSignals={(newSignals) => {
+                  setSignals(prev => [...newSignals, ...prev]);
+                }}
+                onToggle={(enabled) => {
+                  setProject(prev => ({ ...prev, auto_discovery_enabled: enabled }));
+                }}
               />
-            ) : activeTab === 'posts' ? (
-              <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center">
-                <div className="w-20 h-20 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <span className="text-4xl">✍️</span>
+            </div>
+            
+            {signals.length === 0 ? (
+              <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-12 text-center max-w-md mx-auto">
+                <div className="w-16 h-16 bg-[#22c55e]/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <span className="text-3xl">🎯</span>
                 </div>
-                <h2 className="text-2xl font-bold mb-3">Validation Posts</h2>
-                <p className="text-[#a1a1aa] mb-6 max-w-md mx-auto">
-                  AI generates Reddit & X post templates to validate your idea. Copy, post, and track responses.
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#22c55e]/10 border border-[#22c55e]/20 text-[#22c55e] text-sm font-medium">
-                  <span className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse" />
-                  Coming Soon
-                </div>
+                <h2 className="text-xl font-bold mb-2">No signals yet</h2>
+                <p className="text-[#a1a1aa] mb-6">Find Reddit posts where people express your pain point</p>
+                <button 
+                  onClick={() => setShowSearchModal(true)}
+                  className="px-6 py-3 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-bold transition-colors"
+                >
+                  + Add Your First Signal
+                </button>
               </div>
-            ) : activeTab === 'responses' ? (
-              <ResponseTracker
-                projectId={id}
-                projectName={project.name}
-              />
-            ) : activeTab === 'leads' ? (
-              <ValidatedLeadsList
-                signals={signals}
-                outreachMap={outreachMap}
-                onUpdateOutreach={handleUpdateOutreach}
-                projectPain={project.pain_description}
-              />
-            ) : activeTab === 'pipeline' ? (
-              <PipelineView 
-                signals={signals}
-                outreachMap={outreachMap}
-                onUpdateOutreach={handleUpdateOutreach}
-                onDelete={handleDeleteSignal}
-              />
-            ) : activeTab === 'roadmap' ? (
-              <LaunchCalendar 
-                projectId={id}
-                signals={signals}
-                outreachMap={outreachMap}
-                isValidated={isValidated}
-                wouldPayCount={stats.wouldPay}
-                projectName={project.name}
-                projectPain={project.pain_description}
-                targetAudience={project.target_audience}
-                savedCalendar={project.calendar_data}
-                savedProgress={project.calendar_progress}
-                onUpdate={(updates) => setProject(prev => ({ ...prev, ...updates }))}
-              />
             ) : (
-              <div className="text-center text-[#71717a] py-12">
-                Select a tab to view content
-              </div>
+              <>
+                {/* Widgets Row */}
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
+                  <MicroTasks signals={signals} outreachMap={outreachMap} />
+                  <Streaks signals={signals} outreachMap={outreachMap} projectCreatedAt={project.created_at} />
+                </div>
+                
+                <PipelineView 
+                  signals={signals}
+                  outreachMap={outreachMap}
+                  onUpdateOutreach={handleUpdateOutreach}
+                  onDelete={handleDeleteSignal}
+                />
+              </>
             )}
           </>
+        ) : activeTab === 'roadmap' ? (
+          <LaunchCalendar 
+            projectId={id}
+            signals={signals}
+            outreachMap={outreachMap}
+            isValidated={isValidated}
+            signupCount={stats.landingPageSignups}
+            signupGoal={SIGNUP_GOAL}
+            projectName={project.name}
+            projectPain={project.pain_description}
+            targetAudience={project.target_audience}
+            savedCalendar={project.calendar_data}
+            savedProgress={project.calendar_progress}
+            onUpdate={(updates) => setProject(prev => ({ ...prev, ...updates }))}
+          />
+        ) : (
+          <div className="text-center text-[#71717a] py-12">
+            Select a tab to view content
+          </div>
         )}
       </main>
 

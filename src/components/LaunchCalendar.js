@@ -18,7 +18,8 @@ export default function LaunchCalendar({
   signals, 
   outreachMap, 
   isValidated, 
-  wouldPayCount, 
+  signupCount = 0,
+  signupGoal = 5,
   projectName, 
   projectPain,
   targetAudience,
@@ -129,28 +130,78 @@ export default function LaunchCalendar({
   }, [calendar]);
 
   if (!isValidated) {
+    const remaining = signupGoal - signupCount;
+    const progressPercent = Math.min((signupCount / signupGoal) * 100, 100);
+    
     return (
       <div className="bg-[#161618] border border-[#27272a] rounded-2xl p-8">
         <div className="text-center">
           <div className="w-16 h-16 bg-[#27272a] rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">🔒</span>
           </div>
-          <h3 className="text-xl font-bold mb-2">Launch Calendar Locked</h3>
-          <p className="text-[#a1a1aa] mb-4">
-            Get {3 - wouldPayCount} more &quot;I&apos;d pay&quot; signal{3 - wouldPayCount !== 1 ? 's' : ''} to unlock.
+          <h3 className="text-xl font-bold mb-2">Launch Roadmap Locked</h3>
+          <p className="text-[#a1a1aa] mb-6">
+            Get <span className="text-[#22c55e] font-bold">{remaining} more signup{remaining !== 1 ? 's' : ''}</span> on your landing page to unlock.
           </p>
-          <div className="flex items-center justify-center gap-2">
-            {[1, 2, 3].map((i) => (
+          
+          {/* Progress Bar */}
+          <div className="max-w-md mx-auto mb-6">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-[#71717a]">Progress</span>
+              <span className="text-[#22c55e] font-medium">{signupCount} / {signupGoal} signups</span>
+            </div>
+            <div className="h-3 bg-[#27272a] rounded-full overflow-hidden">
               <div 
-                key={i}
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                  i <= wouldPayCount ? 'bg-[#22c55e] text-[#0a0a0b]' : 'bg-[#27272a] text-[#71717a]'
+                className="h-full bg-gradient-to-r from-[#22c55e] to-[#16a34a] transition-all duration-500 rounded-full"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Milestones */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            {[1, 2, 3, 4, 5].map((num) => (
+              <div
+                key={num}
+                className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  signupCount >= num
+                    ? 'bg-[#22c55e] text-[#0a0a0b]'
+                    : 'bg-[#27272a] text-[#71717a]'
                 }`}
               >
-                {i <= wouldPayCount ? '💰' : i}
+                {signupCount >= num ? '✓' : num}
               </div>
             ))}
           </div>
+
+          {/* Tips */}
+          <div className="bg-[#0a0a0b] border border-[#27272a] rounded-xl p-4 max-w-md mx-auto text-left">
+            <h4 className="font-medium mb-3 flex items-center gap-2">
+              <span>💡</span> How to get signups
+            </h4>
+            <ul className="space-y-2 text-sm text-[#a1a1aa]">
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">→</span>
+                Share your landing page on Reddit in relevant subreddits
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">→</span>
+                Post on Twitter/X and tag founders who might be interested
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">→</span>
+                DM people who showed interest in your pipeline
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">→</span>
+                Share in Slack/Discord communities
+              </li>
+            </ul>
+          </div>
+          
+          <p className="text-xs text-[#71717a] mt-4">
+            {signupGoal} signups = validated demand → unlock your launch roadmap
+          </p>
         </div>
       </div>
     );

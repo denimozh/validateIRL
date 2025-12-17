@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import NewProjectModal from '@/components/NewProjectModal';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { supabase } from '@/lib/supabase';
 
 function DashboardContent() {
@@ -15,6 +16,7 @@ function DashboardContent() {
   const [projects, setProjects] = useState([]);
   const [allSignals, setAllSignals] = useState([]);
   const [allOutreach, setAllOutreach] = useState([]);
+  const [totalSignups, setTotalSignups] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -52,6 +54,13 @@ function DashboardContent() {
           .select('*')
           .in('project_id', projectIds);
         setAllOutreach(outreachData || []);
+
+        // Fetch total landing page signups
+        const { count } = await supabase
+          .from('landing_page_signups')
+          .select('*', { count: 'exact', head: true })
+          .in('project_id', projectIds);
+        setTotalSignups(count || 0);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -94,6 +103,11 @@ function DashboardContent() {
     replied: allOutreach.filter(o => ['replied', 'interested', 'would_pay'].includes(o.status)).length,
     wouldPay: allOutreach.filter(o => o.status === 'would_pay').length,
   };
+
+  // Onboarding state
+  const hasProject = projects.length > 0;
+  const hasLandingPage = projects.some(p => p.landing_page_published);
+  const hasSharedPost = projects.some(p => p.has_tracked_posts);
 
   // Get follow-ups due
   const today = new Date();
@@ -196,6 +210,23 @@ function DashboardContent() {
           <div className="grid lg:grid-cols-3 gap-6">
             {/* Left Column - Stats & Recent */}
             <div className="lg:col-span-2 space-y-6">
+              
+              {/* Onboarding Checklist */}
+              <OnboardingChecklist
+                hasProject={hasProject}
+                hasLandingPage={hasLandingPage}
+                hasSharedPost={hasSharedPost}
+                signupCount={totalSignups}
+                signupGoal={5}
+                onNavigate={(action) => {
+                  if (action === 'new-project') {
+                    setShowNewProjectModal(true);
+                  } else if (projects[0]) {
+                    router.push(`/dashboard/project/${projects[0].id}`);
+                  }
+                }}
+              />
+
               {/* Stats Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[

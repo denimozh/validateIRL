@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import SubscriptionGate from '@/components/SubscriptionGate';
 import NewProjectModal from '@/components/NewProjectModal';
 import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { supabase } from '@/lib/supabase';
@@ -30,7 +31,6 @@ function DashboardContent() {
 
   const fetchAllData = async () => {
     try {
-      // Fetch projects
       const { data: projectsData } = await supabase
         .from('projects')
         .select('*')
@@ -39,7 +39,6 @@ function DashboardContent() {
 
       setProjects(projectsData || []);
 
-      // Fetch all signals
       const projectIds = (projectsData || []).map(p => p.id);
       if (projectIds.length > 0) {
         const { data: signalsData } = await supabase
@@ -55,7 +54,6 @@ function DashboardContent() {
           .in('project_id', projectIds);
         setAllOutreach(outreachData || []);
 
-        // Fetch total landing page signups
         const { count } = await supabase
           .from('landing_page_signups')
           .select('*', { count: 'exact', head: true })
@@ -96,7 +94,6 @@ function DashboardContent() {
     }
   };
 
-  // Calculate stats
   const stats = {
     totalSignals: allSignals.length,
     contacted: allOutreach.filter(o => o.status !== 'found').length,
@@ -104,12 +101,10 @@ function DashboardContent() {
     wouldPay: allOutreach.filter(o => o.status === 'would_pay').length,
   };
 
-  // Onboarding state
   const hasProject = projects.length > 0;
   const hasLandingPage = projects.some(p => p.landing_page_published);
   const hasSharedPost = projects.some(p => p.has_tracked_posts);
 
-  // Get follow-ups due
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -126,14 +121,12 @@ function DashboardContent() {
     .filter(o => o.diffDays <= 1 && o.signal)
     .sort((a, b) => a.diffDays - b.diffDays);
 
-  // Get recent signals
   const recentSignals = allSignals.slice(0, 5).map(s => ({
     ...s,
     project: projects.find(p => p.id === s.project_id),
     outreach: allOutreach.find(o => o.signal_id === s.id),
   }));
 
-  // Get project stats
   const getProjectStats = (projectId) => {
     const projectOutreach = allOutreach.filter(o => o.project_id === projectId);
     return {
@@ -151,7 +144,6 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-[#fafafa]">
-      {/* Header */}
       <header className="border-b border-[#27272a]">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex justify-between items-center h-16">
@@ -171,7 +163,6 @@ function DashboardContent() {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="flex gap-1">
             {[
               { id: 'overview', label: 'Overview' },
@@ -199,19 +190,14 @@ function DashboardContent() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-[#22c55e] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : activeTab === 'overview' ? (
-          /* Overview Tab */
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Left Column - Stats & Recent */}
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* Onboarding Checklist */}
               <OnboardingChecklist
                 hasProject={hasProject}
                 hasLandingPage={hasLandingPage}
@@ -227,7 +213,6 @@ function DashboardContent() {
                 }}
               />
 
-              {/* Stats Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Signals', value: stats.totalSignals, icon: '🎯', color: '' },
@@ -245,7 +230,6 @@ function DashboardContent() {
                 ))}
               </div>
 
-              {/* Recent Signals */}
               <div className="bg-[#161618] border border-[#27272a] rounded-xl">
                 <div className="flex items-center justify-between p-4 border-b border-[#27272a]">
                   <h2 className="font-semibold">Recent Signals</h2>
@@ -289,9 +273,7 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Right Column - Projects & Follow-ups */}
             <div className="space-y-6">
-              {/* Quick Actions */}
               <button
                 onClick={() => setShowNewProjectModal(true)}
                 className="w-full px-5 py-3 rounded-xl bg-[#22c55e] hover:bg-[#16a34a] text-[#0a0a0b] font-bold transition-colors flex items-center justify-center gap-2"
@@ -302,7 +284,6 @@ function DashboardContent() {
                 New Project
               </button>
 
-              {/* Due Today */}
               {followUpsDue.length > 0 && (
                 <div className="bg-[#161618] border border-[#27272a] rounded-xl">
                   <div className="flex items-center gap-2 p-4 border-b border-[#27272a]">
@@ -337,7 +318,6 @@ function DashboardContent() {
                 </div>
               )}
 
-              {/* Projects List */}
               <div className="bg-[#161618] border border-[#27272a] rounded-xl">
                 <div className="flex items-center justify-between p-4 border-b border-[#27272a]">
                   <h2 className="font-semibold">Projects</h2>
@@ -381,7 +361,6 @@ function DashboardContent() {
             </div>
           </div>
         ) : activeTab === 'projects' ? (
-          /* Projects Tab */
           <div>
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold">Your Projects</h1>
@@ -470,7 +449,6 @@ function DashboardContent() {
             )}
           </div>
         ) : (
-          /* Follow-ups Tab */
           <div>
             <h1 className="text-2xl font-bold mb-6">Follow-ups</h1>
             
@@ -484,7 +462,6 @@ function DashboardContent() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Overdue & Today */}
                 {followUpsDue.length > 0 && (
                   <div className="bg-[#161618] border border-[#27272a] rounded-xl">
                     <div className="p-4 border-b border-[#27272a]">
@@ -517,7 +494,6 @@ function DashboardContent() {
                   </div>
                 )}
 
-                {/* Upcoming */}
                 {allOutreach.filter(o => {
                   if (!o.follow_up_date) return false;
                   const d = new Date(o.follow_up_date);
@@ -569,14 +545,12 @@ function DashboardContent() {
         )}
       </main>
 
-      {/* New Project Modal */}
       <NewProjectModal
         isOpen={showNewProjectModal}
         onClose={() => setShowNewProjectModal(false)}
         onSubmit={handleCreateProject}
       />
 
-      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteConfirm(null)} />
@@ -605,9 +579,13 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+
   return (
     <ProtectedRoute>
-      <DashboardContent />
+      <SubscriptionGate userId={user?.id} email={user?.email}>
+        <DashboardContent />
+      </SubscriptionGate>
     </ProtectedRoute>
   );
 }

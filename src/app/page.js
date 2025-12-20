@@ -1,34 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase'
 
 export default function LandingPage() {
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('idle');
-
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setStatus('loading');
-    
-    try {
-      const { error } = await supabase
-        .from('waitlist')
-        .insert([{ email }]);
-      
-      if (error) throw error;
-      
-      setStatus('success');
-      setEmail('');
-      setTimeout(() => setStatus('idle'), 3000);
-    } catch {
-      setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
-    }
-  };
-
-  /** FIXED — every item is a 2-element array so destructuring will never crash */
   const comparisonRows = [
     ['AI-generated market research', 'Links to real posts (reddit, Hackerank, etc..)'],
     ['"Your TAM is $4.2B"', '"Here are 17 people who complained about this"'],
@@ -49,12 +23,17 @@ export default function LandingPage() {
             ValidateIRL
           </a>
 
-          <a
-            href="#cta"
-            className="bg-gradient-to-r hover:bg-green-700 hover:cursor-pointer from-[#22c55e] to-[#16a34a] text-[#0a0a0b] px-5 py-2.5 rounded-full font-semibold text-sm hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
-          >
-            Get Early Access
-          </a>
+          <div className="flex items-center gap-4">
+            <a href="/login" className="text-[#a1a1aa] hover:text-white transition-colors text-sm">
+              Sign in
+            </a>
+            <a
+              href="#pricing"
+              className="bg-gradient-to-r hover:bg-green-700 hover:cursor-pointer from-[#22c55e] to-[#16a34a] text-[#0a0a0b] px-5 py-2.5 rounded-full font-semibold text-sm hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
+            >
+              Get Started
+            </a>
+          </div>
         </div>
       </nav>
 
@@ -64,7 +43,7 @@ export default function LandingPage() {
 
         <div className="inline-flex items-center gap-2 bg-[#161618] border border-[#27272a] px-4 py-2 rounded-full text-sm text-[#a1a1aa] mb-8">
           <span className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse" />
-          Launching in 2 weeks
+          Now Live — Start validating today
         </div>
 
         <h1 className="text-2xl md:text-3xl text-slate-300 lg:text-5xl font-extrabold leading-[1.1] mb-6 max-w-4xl">
@@ -79,36 +58,26 @@ export default function LandingPage() {
           and launch to people who already said yes.
         </p>
 
-        {/* EMAIL FORM */}
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 w-full max-w-md">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            className="flex-1 px-5 py-3.5 rounded-full border border-[#27272a] bg-[#161618] text-white placeholder-[#71717a] focus:border-[#22c55e] outline-none"
-          />
-          <button
-            type="submit"
-            disabled={status === 'loading'}
-            className="hover:cursor-pointer px-7 py-3.5 rounded-full bg-[#22c55e] hover:bg-green-600 text-[#0a0a0b] font-bold disabled:opacity-70"
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <a
+            href="#pricing"
+            className="px-8 py-4 rounded-full bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-[#0a0a0b] font-bold text-lg hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
           >
-            {status === 'loading'
-              ? 'Joining...'
-              : status === 'success'
-              ? "You're in! 🎉"
-              : 'Get Early Access'}
-          </button>
-        </form>
-
-        {/* METRICS */}
-        <div className="flex gap-8 mt-10">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-[#22c55e]">2 weeks</div>
-            <div className="text-sm text-[#71717a]">To launch</div>
-          </div>
+            Start Validating — $15/mo
+          </a>
+          <a
+            href="#how-it-works"
+            className="px-8 py-4 rounded-full border border-[#27272a] text-white font-semibold hover:bg-[#161618] transition-all"
+          >
+            See How It Works
+          </a>
         </div>
+
+        {/* Social proof */}
+        <p className="text-sm text-[#71717a] mt-6">
+          Join founders who validate before they build
+        </p>
       </section>
 
       {/* Problem Section */}
@@ -150,7 +119,7 @@ export default function LandingPage() {
       </section>
 
       {/* Solution Section */}
-      <section className="py-24 px-6">
+      <section id="how-it-works" className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block">
             The Solution
@@ -308,7 +277,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PROBLEM SECTION */}
+      {/* COMPARISON SECTION */}
       <section className="py-24 px-6 bg-[#111113]">
         <div className="max-w-4xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block">
@@ -356,6 +325,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* HOW IT WORKS STEPS */}
       <section className="py-24 px-6">
         <div className="max-w-6xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block">
@@ -385,6 +355,7 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FOUNDER STORY */}
       <section className="py-24 px-6 bg-[#111113]">
         <div className="max-w-6xl mx-auto">
           <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block">
@@ -422,7 +393,7 @@ export default function LandingPage() {
                 I realized most validation tools are useless. They give you <span className="text-white font-semibold">AI-generated market research</span> and tell you your &quot;TAM is $4.2B.&quot; None of that tells you if a real human will pay.
               </p>
               <p className="text-lg text-[#a1a1aa] mb-8 leading-relaxed">
-                So I&apos;m building what I wish I had: A tool that finds <span className="text-white font-semibold">real people</span> expressing your pain, helps you talk to them, tracks who&apos;s interested, and turns that into a launch list.
+                So I built what I wish I had: A tool that finds <span className="text-white font-semibold">real people</span> expressing your pain, helps you talk to them, tracks who&apos;s interested, and turns that into a launch list.
               </p>
               <p className="text-lg font-semibold">
                 This time: validate first, then build.
@@ -441,38 +412,144 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section id="cta" className="py-32 px-6 text-center">
-        <div className="max-w-2xl mx-auto">
+      {/* PRICING SECTION */}
+      <section id="pricing" className="py-32 px-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block">
+              Pricing
+            </span>
+            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">
+              Stop building blind
+            </h2>
+            <p className="text-xl text-[#a1a1aa]">
+              One simple price. Everything you need to validate your next idea.
+            </p>
+          </div>
 
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-4">Stop building blind</h2>
-          <p className="text-xl text-[#a1a1aa] mb-10">
-            Get early access and validate your next idea with real people.
+          {/* Pricing Card */}
+          <div className="max-w-md mx-auto">
+            <div className="bg-[#161618] border-2 border-[#22c55e] rounded-3xl p-8 relative overflow-hidden">
+              {/* Glow effect */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[200px] bg-[radial-gradient(ellipse_at_center,rgba(34,197,94,0.2)_0%,transparent_70%)] pointer-events-none" />
+              
+              <div className="text-center mb-8 relative">
+                <h3 className="text-2xl font-bold mb-2">ValidateIRL Pro</h3>
+                <div className="flex items-baseline justify-center gap-1">
+                  <span className="text-5xl font-extrabold text-[#22c55e]">$15</span>
+                  <span className="text-[#71717a]">/month</span>
+                </div>
+                <p className="text-sm text-[#a1a1aa] mt-2">Cancel anytime</p>
+              </div>
+
+              {/* Features */}
+              <div className="space-y-4 mb-8">
+                {[
+                  'Unlimited projects',
+                  'AI-powered signal discovery',
+                  'Intent scoring (HIGH/MEDIUM/LOW)',
+                  'Outreach pipeline & tracking',
+                  'Reply templates',
+                  'Landing page builder',
+                  'Tracked links & analytics',
+                  'Personalized launch roadmap',
+                  'CSV export',
+                ].map((feature, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="text-[#a1a1aa]">{feature}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA Button */}
+              <a
+                href="/signup"
+                className="block w-full py-4 rounded-full bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-[#0a0a0b] font-bold text-lg text-center hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
+              >
+                Get Started Now
+              </a>
+
+              <p className="text-center text-sm text-[#71717a] mt-4">
+                Instant access. No credit card required to start.
+              </p>
+            </div>
+          </div>
+
+          {/* Money back guarantee */}
+          <div className="mt-8 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#161618] border border-[#27272a]">
+              <span className="text-lg">🛡️</span>
+              <span className="text-sm text-[#a1a1aa]">30-day money-back guarantee. No questions asked.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ SECTION */}
+      <section className="py-24 px-6 bg-[#111113]">
+        <div className="max-w-3xl mx-auto">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#22c55e] mb-4 block text-center">
+            FAQ
+          </span>
+          <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
+            Common questions
+          </h2>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: 'How does ValidateIRL find signals?',
+                a: 'We use AI to search Reddit and other platforms for posts where people express real pain points matching your idea. You get direct links to real posts from real people — not AI-generated personas.',
+              },
+              {
+                q: 'What counts as a validated idea?',
+                a: 'We recommend getting at least 3 "I\'d pay" signals — real people saying they would pay for your solution. This is the clearest indicator of demand before you build.',
+              },
+              {
+                q: 'Can I cancel anytime?',
+                a: 'Yes. Cancel anytime with one click. No questions asked. We also offer a 30-day money-back guarantee if you\'re not satisfied.',
+              },
+              {
+                q: 'What platforms do you search?',
+                a: 'Currently we focus on Reddit, which is the richest source of authentic pain points and discussions. More platforms coming soon.',
+              },
+              {
+                q: 'Do I need to know how to code?',
+                a: 'No. ValidateIRL is a no-code tool. You describe your idea, find people expressing the pain, reach out to them, and track their responses. No technical skills required.',
+              },
+            ].map((item, i) => (
+              <div key={i} className="bg-[#161618] border border-[#27272a] rounded-xl p-6">
+                <h4 className="font-semibold mb-2">{item.q}</h4>
+                <p className="text-[#a1a1aa] text-sm">{item.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section className="py-24 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
+            Ready to validate your idea?
+          </h2>
+          <p className="text-xl text-[#a1a1aa] mb-8">
+            Stop guessing. Start with real people who want what you&apos;re building.
           </p>
-
-          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              className="flex-1 px-6 py-4 rounded-full border border-[#27272a] bg-[#161618] text-white placeholder-[#71717a]"
-            />
-            <button
-              type="submit"
-              disabled={status === 'loading'}
-              className="hover:cursor-pointer px-7 py-3.5 rounded-full bg-[#22c55e] hover:bg-green-600 text-[#0a0a0b] font-bold disabled:opacity-70"
-            >
-              {status === 'loading'
-                ? 'Joining...'
-                : status === 'success'
-                ? "You're in! 🎉"
-                : 'Join Waitlist'}
-            </button>
-          </form>
-
-          <p className="text-sm text-[#71717a] mt-4">No spam. Just launch updates.</p>
+          <a
+            href="/signup"
+            className="inline-block px-10 py-4 rounded-full bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-[#0a0a0b] font-bold text-lg hover:-translate-y-0.5 hover:shadow-[0_10px_40px_rgba(34,197,94,0.3)] transition-all"
+          >
+            Get Started — $15/month
+          </a>
+          <p className="text-sm text-[#71717a] mt-4">
+            30-day money-back guarantee
+          </p>
         </div>
       </section>
 

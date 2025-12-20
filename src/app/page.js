@@ -24,7 +24,7 @@ export default function LandingPage() {
           </a>
 
           <div className="flex items-center gap-4">
-            <a href="/login" className="text-[#a1a1aa] hover:text-white transition-colors text-sm">
+            <a href="/signin" className="text-[#a1a1aa] hover:text-white transition-colors text-sm">
               Sign in
             </a>
             <a

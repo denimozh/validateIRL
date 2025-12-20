@@ -7,6 +7,7 @@ export default function SubscriptionGate({ userId, email, children }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [periodEnd, setPeriodEnd] = useState(null);
 
   useEffect(() => {
     if (userId) {
@@ -18,12 +19,25 @@ export default function SubscriptionGate({ userId, email, children }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('subscription_status')
+        .select('subscription_status, subscription_current_period_end')
         .eq('id', userId)
         .single();
 
       if (error) throw error;
-      setStatus(data?.subscription_status);
+      
+      // Check if canceled but still within billing period
+      if (data?.subscription_status === 'canceled' && data?.subscription_current_period_end) {
+        const periodEnd = new Date(data.subscription_current_period_end);
+        if (periodEnd > new Date()) {
+          // Still has access until period ends
+          setStatus('active_until_period_end');
+          setPeriodEnd(periodEnd);
+        } else {
+          setStatus('canceled');
+        }
+      } else {
+        setStatus(data?.subscription_status);
+      }
     } catch (error) {
       console.error('Error checking subscription:', error);
       setStatus('none');
@@ -65,8 +79,30 @@ export default function SubscriptionGate({ userId, email, children }) {
     );
   }
 
-  // If subscribed, show the app
-  if (status === 'active') {
+  // If subscribed (or canceled but still in billing period), show the app
+  if (status === 'active' || status === 'active_until_period_end') {
+    // Show cancellation banner if ending soon
+    if (status === 'active_until_period_end' && periodEnd) {
+      const daysLeft = Math.ceil((periodEnd - new Date()) / (1000 * 60 * 60 * 24));
+      return (
+        <>
+          <div className="bg-yellow-500/10 border-b border-yellow-500/30 px-6 py-3">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <p className="text-yellow-400 text-sm">
+                ⚠️ Your subscription ends in {daysLeft} day{daysLeft !== 1 ? 's' : ''}. Resubscribe to keep access.
+              </p>
+              <button
+                onClick={handleCheckout}
+                className="px-4 py-1.5 rounded-lg bg-yellow-500 hover:bg-yellow-600 text-black text-sm font-medium transition-colors"
+              >
+                Resubscribe
+              </button>
+            </div>
+          </div>
+          {children}
+        </>
+      );
+    }
     return children;
   }
 

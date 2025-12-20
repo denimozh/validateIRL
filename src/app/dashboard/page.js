@@ -154,6 +154,9 @@ function DashboardContent() {
             
             <div className="flex items-center gap-4">
               <span className="text-sm text-[#a1a1aa] hidden sm:block">{user?.email}</span>
+              <Link href="/dashboard/settings" className="text-sm text-[#71717a] hover:text-white transition-colors">
+                Settings
+              </Link>
               <button
                 onClick={() => signOut()}
                 className="text-sm text-[#71717a] hover:text-white transition-colors"

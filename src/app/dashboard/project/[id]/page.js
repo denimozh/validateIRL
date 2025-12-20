@@ -34,7 +34,7 @@ function ProjectContent({ params }) {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [stats, setStats] = useState({ totalSignals: 0, contacted: 0, replied: 0, wouldPay: 0, landingPageSignups: 0 });
   const [activeTab, setActiveTab] = useState('landing');
-  const SIGNUP_GOAL = 0; // Number of signups needed to unlock launch roadmap
+  const SIGNUP_GOAL = 5; // Number of signups needed to unlock launch roadmap
 
   const exportToCSV = () => {
     const headers = [

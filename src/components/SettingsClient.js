@@ -7,7 +7,7 @@ export default function SettingsClient() {
 
   const openBillingPortal = async () => {
     setLoading(true);
-    const res = await fetch("/api/billing/portal", { method: "POST" });
+    const res = await fetch("/api/stripe/portal", { method: "POST" });
     const data = await res.json();
     window.location.href = data.url;
   };

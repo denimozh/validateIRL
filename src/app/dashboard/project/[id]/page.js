@@ -15,7 +15,7 @@ import MicroTasks from '@/components/MicroTasks';
 import Streaks from '@/components/Streaks';
 import AutoDiscovery from '@/components/AutoDiscovery';
 import ResponseTracker from '@/components/ResponseTracker';
-import LandingPageBuilder from '@/components/LandingPageBuilder';
+import LandingPageSection from '@/components/LandingPageSection';
 import PostTracker from '@/components/PostTracker';
 import { supabase } from '@/lib/supabase';
 
@@ -454,11 +454,12 @@ function ProjectContent({ params }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Tab Content - Always show, no signal requirement */}
         {activeTab === 'landing' ? (
-          <LandingPageBuilder
+          <LandingPageSection
             projectId={id}
             projectName={project.name}
             projectPain={project.pain_description}
             targetAudience={project.target_audience}
+            landingPagePublished={project.landing_page_published}
           />
         ) : activeTab === 'posts' ? (
           <PostTracker
